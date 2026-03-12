@@ -50,7 +50,7 @@ function Appcontent() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/homepage" element={<Homepage />} />
                 <Route path="/profile" element={<Profile />}></Route>
-                <Route path="/collaboration" element={<Collaboration />}></Route>
+                <Route path="/collaboration" element={<Collaboration matchingId='123' userId='123' peerId='67'/>}></Route>
                 <Route path="*" element={<Navigate to="/" replace />} /> {/*for unknown URL, it will redirect to login page*/}
             </Routes>
         </div>
