@@ -5,6 +5,7 @@ import { FaUser } from "react-icons/fa"
 import Register from "./pages/register"
 import Homepage from "./pages/homepage"
 import Profile from "./pages/profile"
+import Collaboration from './pages/collaboration'
 
 function Appcontent() {
     const location = useLocation();
@@ -49,6 +50,7 @@ function Appcontent() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/homepage" element={<Homepage />} />
                 <Route path="/profile" element={<Profile />}></Route>
+                <Route path="/collaboration" element={<Collaboration />}></Route>
                 <Route path="*" element={<Navigate to="/" replace />} /> {/*for unknown URL, it will redirect to login page*/}
             </Routes>
         </div>
