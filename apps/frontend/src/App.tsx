@@ -8,7 +8,7 @@ import Profile from "./pages/profile"
 
 function Appcontent() {
     const location = useLocation();
-    const isLoginOrRegister = location.pathname === "/" || location.pathname === "/register";;
+    const isLoginOrRegister = location.pathname === "/" || location.pathname === "/register" || location.pathname.startsWith("/collaboration");
     const [showPassword, setShowPassword] = React.useState(false);
 
     return (
@@ -49,6 +49,7 @@ function Appcontent() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/homepage" element={<Homepage />} />
                 <Route path="/profile" element={<Profile />}></Route>
+                <Route path="/collaboration"> </Route>
                 <Route path="*" element={<Navigate to="/" replace />} /> {/*for unknown URL, it will redirect to login page*/}
             </Routes>
         </div>
@@ -142,18 +143,18 @@ const styles = {
     input: {
         marginBottom: "5px",
         borderRadius: "10px",
-        width: "250px",       // Fixed width (aligned boxes)
+        width: "250px",       
         padding: "12px",
     },
     label: {
         marginBottom: "5px",
         textAlign: "left" as const,
         display: "block",
-        width: "250px",       // ← ADD (matches input width)
+        width: "250px",       
     },
     form: {
-        maxWidth: "300px",  // Container width limit
-        margin: "0 auto",   // Center form
+        maxWidth: "300px",  
+        margin: "0 auto",   
     },
 
     button: {
