@@ -104,6 +104,7 @@ const navbarHomepageStyle = {
     marginRight: "20px",
     alignItems: "center",                 // ← add this
     boxSizing: "border-box" as const,     // ← add this
+    zIndex: 9999
 };
 
 
