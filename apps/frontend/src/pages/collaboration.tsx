@@ -231,6 +231,7 @@ function Collaboration() {
                     <div style={{
                         flex: codeExpanded ? "1 1 50%" : "1 1 100%",
                         minWidth: 0,
+                        height: 1000,
                         transition: "flex 0.3s ease",
                         display: "flex",
                         flexDirection: "column",
