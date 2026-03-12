@@ -1,5 +1,5 @@
 import { useState } from "react";
-// import Whiteboard from "../components/collaboration/Whiteboard"
+import Whiteboard from "../components/collaboration/Whiteboard"
 import CodeSpace from "../components/collaboration/CodeSpace";
 import HintPanel from "../components/collaboration/HintPanel";
 
@@ -235,7 +235,7 @@ function Collaboration() {
                         display: "flex",
                         flexDirection: "column",
                     }}>
-                        {/* <Whiteboard /> */}
+                        <Whiteboard/>
                     </div>
 
                     {/* Code space */}
