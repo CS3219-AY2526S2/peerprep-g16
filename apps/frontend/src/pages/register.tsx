@@ -17,19 +17,24 @@ function Register() {
         else if (!handlePasswordValidation()) return
         else if (!handleConfirmPasswordValidation()) return
 
-        /*try {
-            await axios.post('http://localhost:8080/api/users', {
+        try {
+            await axios.post('http://localhost:3001/users', {
                 username,
                 email,
                 password,
             })
+            setError("")
             setSuccess("Registration successful! Redirecting to login...")
-            setTimeout(() => navigate('/'), 2000)  // wait 2 seconds then redirect
-        } catch (error : any) {
-            console.log(error)
-            setError(error.response?.data?.message || 'Registration failed.')
+            setTimeout(() => navigate('/'), 2000)
+        } catch (error: any) {
+            if (error.response?.status === 409) {
+                setError("Username already exists, please choose a different one.")
+            }
+            else {
+                console.log(error)
+                setError(error.response?.data?.message || 'Registration failed.')
+            }
         }
-            */
     }
 
 
@@ -123,7 +128,7 @@ function Register() {
                     style={styles.input}
                 />
             </label>
-            <p style={styles.passwordBorder}>
+            <div style={styles.passwordBorder}>
                 <span style={{ color: "red", fontWeight: "bold" }}>
                     Password Requirements:
                 </span>
@@ -134,7 +139,7 @@ function Register() {
                     <li>At least 1 Number</li>
                     <li>At least 1 Special Character</li>
                 </ul>
-            </p>
+            </div>
             <label style={styles.label}>
                 Confirm Password:
                 <input
@@ -155,11 +160,15 @@ function Register() {
 }
 const styles = {
     container: {
-        marginTop: "100px",
+        marginTop: "50px",
         textAlign: "center" as const,
         maxWidth: "280px",
         marginLeft: "auto",
         marginRight: "auto",
+        display: "flex",
+        flexDirection: "column" as const,
+        alignItems: "center" as const,
+        justifyContent: "flex-start" as const,  // add this
     },
     heading: {
         fontSize: "24px",
@@ -171,18 +180,17 @@ const styles = {
     input: {
         marginBottom: "5px",
         borderRadius: "10px",
-        width: "250px",       // Fixed width (aligned boxes)
+        width: "250px",
         padding: "12px",
+        border: "1px solid #ccc",
+        outline: "none",
+        boxSizing: "border-box" as const,
     },
     label: {
         marginBottom: "5px",
         textAlign: "left" as const,
         display: "block",
-        width: "250px",       // ← ADD (matches input width)
-    },
-    form: {
-        maxWidth: "300px",  // Container width limit
-        margin: "0 auto",   // Center form
+        width: "250px",
     },
     passwordBorder: {
         backgroundColor: "#f5f5f5",
@@ -201,13 +209,13 @@ const styles = {
     },
 
     button: {
-        width: "auto",
-        padding: "10px",
-        backgroundColor: "#007BFF",
-        color: "white",
-        border: "none",
+        padding: "10px 20px",
+        backgroundColor: "white",
+        border: "2px solid #333",
+        borderRadius: "20px",
+        fontWeight: "bold" as const,
+        fontSize: "15px",
         cursor: "pointer",
-        marginBottom: "10px",
     },
     link: {
         textDecoration: "none",
