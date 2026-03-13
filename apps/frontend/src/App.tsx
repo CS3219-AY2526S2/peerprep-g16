@@ -1,10 +1,12 @@
 import './App.css'
-import React from "react"
-import { BrowserRouter, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom'
+import React, { useState } from "react"
+import { BrowserRouter, Routes, Route, Link, useLocation, Navigate, useNavigate } from 'react-router-dom'
 import { FaUser } from "react-icons/fa"
 import Register from "./pages/register"
 import Homepage from "./pages/homepage"
 import Profile from "./pages/profile"
+import axios from "axios";
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("login");
     if (!stored) return <Navigate to="/" replace />;
@@ -19,6 +21,30 @@ function Appcontent() {
     const location = useLocation();
     const isLoginOrRegister = location.pathname === "/" || location.pathname === "/register" || location.pathname.startsWith("/collaboration");
     const [showPassword, setShowPassword] = React.useState(false);
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
+    const navigate = useNavigate();
+
+    React.useEffect(() => {
+        if (location.pathname === "/") {
+            setError("");
+            setSuccess("");
+            setEmail("");
+            setPassword("");
+        }
+    }, [location.pathname]);
+
+    const login = async (event: any) => {
+        event.preventDefault();
+        try {
+            const response = await axios.post("http://localhost:3001/auth/login", {
+                email,
+                password,
+            });
+
+            console.log("response", response);
             localStorage.setItem(
                 "login",
                 JSON.stringify({
@@ -29,6 +55,21 @@ function Appcontent() {
                     email: response.data.data.email,
                 })
             );
+            setSuccess("Login successful! Directing to homepage...")
+            setError("")
+            setTimeout(() => {
+                setSuccess("")
+                navigate('/homepage')
+            }, 1000)
+        } catch (error: any) {
+            setEmail("")
+            setPassword("")
+            if (error.response !== undefined) {
+                setError(error.response.data.message);
+            }
+            console.log(error);
+        }
+    };
 
     return (
         <div style={{ overflow: "hidden" }}>
@@ -37,9 +78,11 @@ function Appcontent() {
                 <Route path="/" element={
                     <div style={styles.container}>
                         <label style={styles.label}>
-                            Email/Username:
+                            Email:
                             <input
                                 type="text"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
                                 style={styles.input}
                             />
                         </label>
@@ -47,6 +90,8 @@ function Appcontent() {
                             Password:
                             <input
                                 type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
                                 style={styles.input}
                             />
                         </label>
@@ -57,17 +102,17 @@ function Appcontent() {
                             {showPassword ? "Hide Password" : "Show Password"}
                         </button>
                         <br />
-                        <button style={styles.button} type="submit">
+                        <button onClick={login} style={styles.button}>
                             Login
                         </button>
+                        {success && <p style={{ color: "green" }}>{success}</p>}
+                        {error && <p style={{ color: "red" }}>{error}</p>}
                         <p>
                             Don't have an account? <Link to="/register" style={styles.link}>Register</Link>.
                         </p>
                     </div>
                 } />
                 <Route path="/register" element={<Register />} />
-                <Route path="/homepage" element={<Homepage />} />
-                <Route path="/profile" element={<Profile />}></Route>
                 <Route path="/homepage" element={
                     <ProtectedRoute>
                         <Homepage />
@@ -95,6 +140,13 @@ function App() {
 }
 
 function HomepageNavbar() {
+    const navigate = useNavigate();
+
+    const handleLogout = () => {
+        localStorage.removeItem("login");
+        navigate("/");
+    };
+
     return (
         <div style={navbarHomepageStyle}>
             <Link to="/homepage" style={styles.link}>
@@ -105,6 +157,9 @@ function HomepageNavbar() {
                 <Link to="/profile" style={{ color: "#333" }}>
                     <FaUser size={30} />
                 </Link>
+                <button onClick={handleLogout} style={styles.logoutButton}>
+                    Logout
+                </button>
             </div>
         </div>
     )
@@ -131,8 +186,8 @@ const navbarHomepageStyle = {
     gap: "15px",
     marginLeft: "auto",
     marginRight: "20px",
-    alignItems: "center",                 // ← add this
-    boxSizing: "border-box" as const,     // ← add this
+    alignItems: "center",                 
+    boxSizing: "border-box" as const,     
 };
 
 
@@ -148,9 +203,12 @@ const styles = {
     container: {
         marginTop: "100px",
         textAlign: "center" as const,
-        maxWidth: "280px",     // ← ADD (limits form width)
-        marginLeft: "auto",    // ← ADD
-        marginRight: "auto",   // ← ADD
+        maxWidth: "280px",
+        marginLeft: "auto",
+        marginRight: "auto",
+        display: "flex",
+        flexDirection: "column" as const,
+        alignItems: "center" as const,
     },
     navbarContainer: {
         border: "1px solid #ccc",
@@ -163,7 +221,7 @@ const styles = {
         top: 0,
         left: 0,
     },
-        heading: {
+    heading: {
         fontSize: "24px",
         color: "#333",
     },
@@ -173,28 +231,40 @@ const styles = {
     input: {
         marginBottom: "5px",
         borderRadius: "10px",
-        width: "250px",       
+        width: "250px",
         padding: "12px",
+        border: "1px solid #ccc",
+        outline: "none",
+        boxSizing: "border-box" as const,
     },
     label: {
         marginBottom: "5px",
         textAlign: "left" as const,
         display: "block",
-        width: "250px",       
+        width: "250px",
     },
     form: {
-        maxWidth: "300px",  
-        margin: "0 auto",   
+        maxWidth: "300px",
+        margin: "0 auto",
     },
 
     button: {
-        width: "auto",
-        padding: "10px",
-        backgroundColor: "#007BFF",
-        color: "white",
-        border: "none",
+        padding: "10px 20px",
+        backgroundColor: "white",
+        border: "2px solid #333",
+        borderRadius: "20px",
+        fontWeight: "bold" as const,
+        fontSize: "15px",
         cursor: "pointer",
-        marginBottom: "10px",
+    },
+    logoutButton: {
+        padding: "10px 20px",
+        backgroundColor: "white",
+        border: "2px solid #333",
+        borderRadius: "20px",
+        fontWeight: "bold" as const,
+        fontSize: "15px",
+        cursor: "pointer",
     },
     link: {
         textDecoration: "none",
