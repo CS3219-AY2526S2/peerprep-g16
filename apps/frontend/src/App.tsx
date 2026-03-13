@@ -5,11 +5,30 @@ import { FaUser } from "react-icons/fa"
 import Register from "./pages/register"
 import Homepage from "./pages/homepage"
 import Profile from "./pages/profile"
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+    const stored = localStorage.getItem("login");
+    if (!stored) return <Navigate to="/" replace />;
+
+    const { userLogin } = JSON.parse(stored);
+    if (!userLogin) return <Navigate to="/" replace />;
+
+    return children;
+}
 
 function Appcontent() {
     const location = useLocation();
     const isLoginOrRegister = location.pathname === "/" || location.pathname === "/register" || location.pathname.startsWith("/collaboration");
     const [showPassword, setShowPassword] = React.useState(false);
+            localStorage.setItem(
+                "login",
+                JSON.stringify({
+                    userLogin: true,
+                    token: response.data.data.accessToken,
+                    id: response.data.data.id,
+                    username: response.data.data.username,
+                    email: response.data.data.email,
+                })
+            );
 
     return (
         <div style={{ overflow: "hidden" }}>
@@ -49,6 +68,17 @@ function Appcontent() {
                 <Route path="/register" element={<Register />} />
                 <Route path="/homepage" element={<Homepage />} />
                 <Route path="/profile" element={<Profile />}></Route>
+                <Route path="/homepage" element={
+                    <ProtectedRoute>
+                        <Homepage />
+                    </ProtectedRoute>
+                } />
+                <Route path="/profile" element={
+                    <ProtectedRoute>
+                        <Profile />
+                    </ProtectedRoute>
+                } />
+                <Route path="/history"></Route>
                 <Route path="/collaboration"> </Route>
                 <Route path="*" element={<Navigate to="/" replace />} /> {/*for unknown URL, it will redirect to login page*/}
             </Routes>
