@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { AdminGuard } from '../auth/admin.guard';
 import { QuestionService } from './question.service';
 
 /**
@@ -6,6 +7,7 @@ import { QuestionService } from './question.service';
  * Maps incoming requests to the QuestionService.
  */
 @Controller('questions')
+@UseGuards(AdminGuard)
 export class QuestionController {
   constructor(private readonly questionService: QuestionService) {}
 
@@ -34,7 +36,7 @@ export class QuestionController {
    * @returns The newly created question
    */
   @Post()
-  async create(@Body() body: any){
+  async create(@Body() body: any) {
     return this.questionService.create(body);
   }
 }

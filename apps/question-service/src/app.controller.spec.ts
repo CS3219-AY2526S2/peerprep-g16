@@ -1,9 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { AppController } from './app.controller';
+import { ConfigService } from '@nestjs/config';
 import { QuestionController } from './question/question.controller';
-import { findPackageJSON } from 'module';
 import { QuestionService } from './question/question.service';
-import { create } from 'domain';
 
 describe('QuestionController', () => {
   let controller: QuestionController;
@@ -27,11 +25,17 @@ describe('QuestionController', () => {
           provide: QuestionService,
           useValue: mockQuestionService,
         },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn(),
+          },
+        },
       ],
-    }).compile;
+    }).compile();
 
     controller = module.get<QuestionController>(QuestionController);
-  })
+  });
 
   describe('findAll', () => {
     /**
@@ -101,12 +105,12 @@ describe('QuestionController', () => {
         },
       };
 
-      const createdQuestion = {_id: 'mock-id', ...body };
+      const createdQuestion = { _id: 'mock-id', ...body };
 
       mockQuestionService.create.mockResolvedValue(createdQuestion);
 
       await expect(controller.create(body)).resolves.toEqual(createdQuestion);
       expect(mockQuestionService.create).toHaveBeenCalledWith(body);
-    })
-  })
+    });
+  });
 });

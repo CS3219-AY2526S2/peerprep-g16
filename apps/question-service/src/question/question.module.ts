@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AdminGuard } from '../auth/admin.guard';
 import { Question, QuestionSchema } from './schemas/question.schema';
 import { QuestionController } from './question.controller';
 import { QuestionService } from './question.service';
@@ -12,9 +13,9 @@ import { QuestionService } from './question.service';
   imports: [
     MongooseModule.forFeature([
       { name: Question.name, schema: QuestionSchema },
-    ])
+    ]),
   ],
   controllers: [QuestionController],
-  providers: [QuestionService],
+  providers: [QuestionService, AdminGuard],
 })
 export class QuestionModule {}
