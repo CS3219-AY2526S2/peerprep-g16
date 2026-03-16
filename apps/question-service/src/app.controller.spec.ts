@@ -9,6 +9,8 @@ describe('QuestionController', () => {
   const mockQuestionService = {
     findAll: jest.fn(),
     create: jest.fn(),
+    deleteByQuestionId: jest.fn(),
+    updateByQuestionId: jest.fn(),
   };
 
   /**
@@ -111,6 +113,54 @@ describe('QuestionController', () => {
 
       await expect(controller.create(body)).resolves.toEqual(createdQuestion);
       expect(mockQuestionService.create).toHaveBeenCalledWith(body);
+    });
+  });
+
+  describe('delete', () => {
+    /**
+     * Verifies that the controller forwards the route parameter
+     * to the service and returns the deleted question result.
+     */
+    it('should delete a question via the service', async () => {
+      const deletedQuestion = {
+        questionId: 'two-sum',
+        title: 'Two Sum',
+      };
+
+      mockQuestionService.deleteByQuestionId.mockResolvedValue(deletedQuestion);
+
+      await expect(controller.delete('two-sum')).resolves.toEqual(deletedQuestion);
+      expect(mockQuestionService.deleteByQuestionId).toHaveBeenCalledWith('two-sum');
+    });
+  });
+
+  describe('update', () => {
+    /**
+     * Verifies that the controller forwards the route parameter
+     * and request payload to the service and returns the updated question.
+     */
+    it('should update a question via the service', async () => {
+      const body = {
+        title: 'Two Sum Updated',
+        difficulty: 'Medium',
+        hints: ['Use a map', 'Look for complement first'],
+      };
+
+      const updatedQuestion = {
+        questionId: 'two-sum',
+        title: 'Two Sum Updated',
+        topic: 'Arrays',
+        difficulty: 'Medium',
+        hints: ['Use a map', 'Look for complement first'],
+      };
+
+      mockQuestionService.updateByQuestionId.mockResolvedValue(updatedQuestion);
+
+      await expect(controller.update('two-sum', body)).resolves.toEqual(updatedQuestion);
+      expect(mockQuestionService.updateByQuestionId).toHaveBeenCalledWith(
+        'two-sum',
+        body,
+      );
     });
   });
 });
