@@ -13,6 +13,7 @@ import {
   updateUserPrivilegeById as _updateUserPrivilegeById,
 } from "../model/repository.js";
 import AttemptModel from "../model/attempt-model.js";
+import UserModel from "../model/user-model.js";
 
 export async function createUser(req, res) {
   try {
@@ -26,7 +27,8 @@ export async function createUser(req, res) {
       const salt = bcrypt.genSaltSync(10);
       const hashedPassword = bcrypt.hashSync(password, salt);
       const encryptedEmail = encrypt(email.toLowerCase());
-      const createdUser = await _createUser(username, encryptedEmail, hashedPassword);
+      const isAdmin = email.toLowerCase() === process.env.ADMIN_EMAIL?.toLowerCase();
+      const createdUser = await _createUser(username, encryptedEmail, hashedPassword, isAdmin);
       return res.status(201).json({
         message: `Created new user ${username} successfully`,
         data: formatUserResponse(createdUser),
@@ -98,7 +100,8 @@ export async function updateUser(req, res) {
         const salt = bcrypt.genSaltSync(10);
         hashedPassword = bcrypt.hashSync(password, salt);
       }
-      const updatedUser = await _updateUserById(userId, username, email, hashedPassword);
+      const encryptedEmail = email ? encrypt(email.toLowerCase()) : undefined;
+      const updatedUser = await _updateUserById(userId, username, encryptedEmail, hashedPassword);
       return res.status(200).json({
         message: `Updated data for user ${userId}`,
         data: formatUserResponse(updatedUser),
@@ -126,6 +129,11 @@ export async function updateUserPrivilege(req, res) {
         return res.status(404).json({ message: `User ${userId} not found` });
       }
 
+      // Prevent admin from removing their own privilege
+      if (req.user.id === userId && isAdmin === false) {
+        return res.status(403).json({ message: "Admins cannot remove their own admin privilege" });
+      }
+      
       const updatedUser = await _updateUserPrivilegeById(userId, isAdmin === true);
       return res.status(200).json({
         message: `Updated privilege for user ${userId}`,
@@ -151,6 +159,13 @@ export async function deleteUser(req, res) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
 
+    // Prevent deleting the last admin account
+    if (user.isAdmin) {
+      const adminCount = await UserModel.countDocuments({ isAdmin: true });
+      if (adminCount <= 1) {
+        return res.status(403).json({ message: "Cannot delete the last admin account" });
+      }
+    }
     await _deleteUserById(userId);
     return res.status(200).json({ message: `Deleted user ${userId} successfully` });
   } catch (err) {
