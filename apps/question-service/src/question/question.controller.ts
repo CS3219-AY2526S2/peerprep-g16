@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AdminGuard } from '../auth/admin.guard';
 import { QuestionService } from './question.service';
 
@@ -7,7 +7,6 @@ import { QuestionService } from './question.service';
  * Maps incoming requests to the QuestionService.
  */
 @Controller('questions')
-@UseGuards(AdminGuard)
 export class QuestionController {
   constructor(private readonly questionService: QuestionService) {}
 
@@ -35,8 +34,42 @@ export class QuestionController {
    * @param body Request body containing the question data
    * @returns The newly created question
    */
+  @UseGuards(AdminGuard)
   @Post()
   async create(@Body() body: any) {
     return this.questionService.create(body);
+  }
+
+  /**
+   * Deletes a question from the question bank by its questionId.
+   *
+   * This endpoint is intended for admin-only use.
+   *
+   * @param questionId Unique question identifier from the route parameter
+   * @returns The deleted question
+   */
+  @UseGuards(AdminGuard)
+  @Delete(':questionId')
+  async delete(@Param('questionId') questionId: string) {
+    return this.questionService.deleteByQuestionId(questionId);
+  }
+
+  /**
+   * Updates an existing question in the question bank by its questionId.
+   *
+   * This endpoint is intended for admin-only use and allows partial or full
+   * modification of a question's stored data without recreating the record.
+   *
+   * @param questionId Unique question identifier from the route parameter
+   * @param body Request body containing the fields to update
+   * @returns The updated question
+   */
+  @UseGuards(AdminGuard)
+  @Patch(':questionId')
+  async update(
+    @Param('questionId') questionId: string,
+    @Body() body: any,
+  ) {
+    return this.questionService.updateByQuestionId(questionId, body);
   }
 }

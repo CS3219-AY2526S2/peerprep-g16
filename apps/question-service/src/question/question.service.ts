@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Question, QuestionDocument } from './schemas/question.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -44,5 +44,53 @@ export class QuestionService {
   async create(createQuestionDto: any) {
     const createdQuestion = new this.questionModel(createQuestionDto);
     return createdQuestion.save();
+  }
+
+  /**
+   * Deletes an existing question using its stable questionId.
+   *
+   * This is intended for admin-only question management. If no matching
+   * question exists, a NotFoundException should be thrown.
+   *
+   * @param questionId Unique question identifier
+   * @returns Promise resolving to the deleted question document
+   */
+  async deleteByQuestionId(questionId: string) {
+    const deleted = await this.questionModel.findOneAndDelete({ questionId }).exec();
+
+    if (!deleted) {
+      throw new NotFoundException(`Question ${questionId} not found`);
+    }
+
+    return deleted;
+  }
+
+  /**
+   * Updates an existing question using its stable questionId.
+   *
+   * This performs an in-place update rather than deleting and recreating
+   * the record, which helps preserve question identity across services.
+   * The questionId itself should generally remain unchanged.
+   *
+   * @param questionId Unique question identifier
+   * @param updateQuestionDto Partial payload containing fields to update
+   * @returns Promise resolving to the updated question document
+   */
+  async updateByQuestionId(questionId: string, updateQuestionDto: any) {
+    delete updateQuestionDto.questionId;
+
+    const updated = await this.questionModel
+      .findOneAndUpdate(
+        { questionId },
+        { $set: updateQuestionDto },
+        { new: true, runValidators: true },
+      )
+      .exec();
+
+    if (!updated) {
+      throw new NotFoundException(`Question ${questionId} not found`);
+    }
+
+    return updated;
   }
 }
