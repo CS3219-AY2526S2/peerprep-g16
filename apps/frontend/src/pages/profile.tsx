@@ -1,5 +1,5 @@
 import React from "react"
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios"
 
@@ -9,13 +9,19 @@ function Profile() {
     const token = user?.token;
     const [activeTab, setActiveTab] = React.useState("username");
     const [newUsername, setNewUsername] = useState("");
+    const [currentUsername, setCurrentUsername] = useState("");
     const [newEmail, setEmail] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [currentPassword, setCurrentPassword] = useState("");
+    const [success, setSuccess] = useState("");
     const [error, setError] = useState("");
     const navigate = useNavigate();
-    const [success, setSuccess] = useState("");
+
+    useEffect(() => {
+        setSuccess("");
+        setError("");
+    }, [activeTab])
 
     const handleEmailUpdate = async () => {
         if (!emailChange()) return
@@ -32,7 +38,6 @@ function Profile() {
             }));
             setError("")
             setSuccess("Email Update successful!")
-            setTimeout(() => navigate('/profile'), 1000)
         } catch (error: any) {
             console.log(error)
             setError(error.response?.data?.message || 'Email Update failed.')
@@ -58,9 +63,7 @@ function Profile() {
     }
 
     const handlePasswordUpdate = async () => {
-        if (!currentPasswordValidation()) return
-        else if (!passwordChange()) return
-        else if (!handlePasswordValidation()) return
+        if (!handlePasswordValidation()) return
         else if (!handleConfirmPasswordValidation()) return
 
         try {
@@ -74,7 +77,6 @@ function Profile() {
             }));
             setError("")
             setSuccess("Password Update successful!")
-            setTimeout(() => navigate('/profile'), 1000)
         } catch (error: any) {
             console.log(error)
             setError(error.response?.data?.message || 'Email Update failed.')
@@ -129,68 +131,59 @@ function Profile() {
         }
         return true
     }
-
-    const passwordChange = () => {
-        if (newPassword === user?.password) {
-            setError("Please enter a new password.");
-            setNewPassword("")
-            setConfirmPassword("")
-            return false;
-        }
-        setError("");
-        return true;
-    }
-
-    const currentPasswordValidation = () => {
-        if (currentPassword !== user?.password) {
-            setError("Please enter the correct current password.")
-            setCurrentPassword("")
-            setNewPassword("")
-            setConfirmPassword("")
-            return false;
-        }
-        setError("");
-        return true;
-    }
-
     const handleUsernameUpdate = async () => {
-    if (!usernameChange()) return
+        if (!usernameChange()) return
 
-    try {
-        await axios.patch(`http://localhost:3001/users/${user?.id}`,
-            { username: newUsername },
-            { headers: { Authorization: `Bearer ${token}` } }
-        )
-        localStorage.setItem("login", JSON.stringify({
-            ...JSON.parse(localStorage.getItem("login")!),
-            username: newUsername,
-        }));
-        setError("")
-        setSuccess("Username Update successful!")
-        setTimeout(() => navigate('/profile'), 1000)
-    } catch (error: any) {
-        console.log(error)
-        if (error.response?.status === 409) {
-            setError("Username already exists, please choose a different one.")
-        } else {
-            setError(error.response?.data?.message || 'Username Update failed.')
+        try {
+            await axios.patch(`http://localhost:3001/users/${user?.id}`,
+                { username: newUsername },
+                { headers: { Authorization: `Bearer ${token}` } }
+            )
+            localStorage.setItem("login", JSON.stringify({
+                ...JSON.parse(localStorage.getItem("login")!),
+                username: newUsername,
+            }));
+            setError("")
+            setSuccess("Username Update successful!")
+        } catch (error: any) {
+            console.log(error)
+            if (error.response?.status === 409) {
+                setError("Username already exists, please choose a different one.")
+            } else {
+                setError(error.response?.data?.message || 'Username Update failed.')
+            }
         }
     }
-}
 
-const usernameChange = () => {
-    if (newUsername === user?.username) {
-        setError("Please enter a new username.")
-        setNewUsername("")
-        return false;
+    const usernameChange = () => {
+        if (newUsername === user?.username) {
+            setError("Please enter a new username.")
+            setNewUsername("")
+            return false;
+        }
+        setError("");
+        return true;
     }
-    setError("");
-    return true;
-}
+
+    const handleAccountDeletion = async () => {
+        const confirmed = window.confirm("Are you sure you want to delete your account? This action cannot be undone.");
+        if (!confirmed) return;
+
+        try {
+            await axios.delete(`http://localhost:3001/users/${user?.id}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            )
+            localStorage.removeItem("login");
+            navigate("/");
+        } catch (error: any) {
+            setError(error.response?.data?.message || 'Account deletion failed.')
+        }
+
+    }
 
 
     return (
-        <div style={{ display: "flex", marginTop: "60px" }}>
+        <div style={{ display: "flex", marginTop: "60px", minHeight: "100vh" }}>
             <div style={styles.sidebar}>
                 <h3 style={styles.heading}>Account</h3>
                 <button onClick={() => setActiveTab("username")} style={activeTab === "username" ? styles.activeTab : styles.tab}>
@@ -202,6 +195,9 @@ const usernameChange = () => {
                 <button onClick={() => setActiveTab("password")} style={activeTab === "password" ? styles.activeTab : styles.tab}>
                     Password Update
                 </button>
+                <button onClick={() => setActiveTab("delete")} style={activeTab === "delete" ? styles.activeTab : styles.tab}>
+                    Account Deletion
+                </button>
             </div>
             <div style={{ flex: 1, padding: "60px", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
                 {activeTab === "username" && (
@@ -211,9 +207,9 @@ const usernameChange = () => {
                         </label>
                         <label style={styles.label}>
                             New Username:
-                            <input type="text" 
-                            onChange={(e) => setNewUsername(e.target.value)}
-                            style={styles.input} />
+                            <input type="text"
+                                onChange={(e) => setNewUsername(e.target.value)}
+                                style={styles.input} />
                         </label>
                         <button onClick={handleUsernameUpdate} style={styles.button}>Submit</button>
                         {success && <p style={{ color: "green" }}>{success}</p>}
@@ -272,6 +268,15 @@ const usernameChange = () => {
                                 style={styles.input} />
                         </label>
                         <button onClick={handlePasswordUpdate} style={styles.button}>Submit</button>
+                        {success && <p style={{ color: "green" }}>{success}</p>}
+                        {error && <p style={{ color: "red" }}>{error}</p>}
+                    </>
+
+                )}
+
+                {activeTab === "delete" && (
+                    <>
+                        <button onClick={handleAccountDeletion} style={styles.button}>Delete Account</button>
                         {success && <p style={{ color: "green" }}>{success}</p>}
                         {error && <p style={{ color: "red" }}>{error}</p>}
                     </>
@@ -349,7 +354,7 @@ const styles = {
 
     sidebar: {
         width: "200px",
-        height: "auto",
+        minHeight: "100vh",    // change from height: "auto"
         borderRight: "1px solid #000000",
         textAlign: "left" as const,
         left: 0,

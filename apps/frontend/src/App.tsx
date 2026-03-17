@@ -4,10 +4,22 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Navigate, useNavigate 
 import { FaUser } from "react-icons/fa"
 import Register from "./pages/register"
 import Homepage from "./pages/homepage"
+import AdminPage from "./pages/adminPage"
 import Profile from "./pages/profile"
 import axios from "axios";
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
+    const stored = localStorage.getItem("login");
+    if (!stored) return <Navigate to="/" replace />;
+
+    const { userLogin, isAdmin } = JSON.parse(stored);
+    if (!userLogin) return <Navigate to="/" replace />;
+    if (isAdmin) return <Navigate to="/admin" replace />;
+
+    return children;
+}
+
+function ProtectedBothRoute({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("login");
     if (!stored) return <Navigate to="/" replace />;
 
@@ -17,9 +29,23 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return children;
 }
 
+function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
+    const stored = localStorage.getItem("login");
+    if (!stored) return <Navigate to="/" replace />;
+
+    const { userLogin, isAdmin } = JSON.parse(stored);
+    if (!userLogin) return <Navigate to="/" replace />;
+    if (!isAdmin) return <Navigate to="/homepage" replace />;
+
+    return children;
+}
+
+
 function Appcontent() {
     const location = useLocation();
     const isLoginOrRegister = location.pathname === "/" || location.pathname === "/register" || location.pathname.startsWith("/collaboration");
+    const stored = localStorage.getItem("login");
+    const isAdmin = stored ? JSON.parse(stored).isAdmin : false;
     const [showPassword, setShowPassword] = React.useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -53,13 +79,18 @@ function Appcontent() {
                     id: response.data.data.id,
                     username: response.data.data.username,
                     email: response.data.data.email,
+                    isAdmin: response.data.data.isAdmin,
                 })
             );
             setSuccess("Login successful! Directing to homepage...")
             setError("")
             setTimeout(() => {
                 setSuccess("")
-                navigate('/homepage')
+                if (response.data.data.isAdmin) {
+                    navigate('/admin')
+                } else {
+                    navigate('/homepage')
+                }
             }, 1000)
         } catch (error: any) {
             setEmail("")
@@ -73,7 +104,7 @@ function Appcontent() {
 
     return (
         <div style={{ overflow: "hidden" }}>
-            {isLoginOrRegister ? <DefaultNavbar /> : <HomepageNavbar />}
+            {isLoginOrRegister ? <DefaultNavbar /> : isAdmin ? <AdminPageNavbar /> : <HomepageNavbar />}
             <Routes>
                 <Route path="/" element={
                     <div style={styles.container}>
@@ -114,14 +145,19 @@ function Appcontent() {
                 } />
                 <Route path="/register" element={<Register />} />
                 <Route path="/homepage" element={
-                    <ProtectedRoute>
+                    <ProtectedUserRoute>
                         <Homepage />
-                    </ProtectedRoute>
+                    </ProtectedUserRoute>
                 } />
                 <Route path="/profile" element={
-                    <ProtectedRoute>
+                    <ProtectedBothRoute>
                         <Profile />
-                    </ProtectedRoute>
+                    </ProtectedBothRoute>
+                } />
+                <Route path="/admin" element={
+                    <ProtectedAdminRoute>
+                        <AdminPage />
+                    </ProtectedAdminRoute>
                 } />
                 <Route path="/history"></Route>
                 <Route path="/collaboration"> </Route>
@@ -172,6 +208,32 @@ function DefaultNavbar() {
         </div>
     )
 }
+
+function AdminPageNavbar() {
+    const navigate = useNavigate();
+
+
+    const handleLogout = () => {
+        localStorage.removeItem("login");
+        navigate("/");
+    };
+
+    return (
+        <div style={navbarHomepageStyle}>
+            <Link to="/homepage" style={styles.link}>
+                <h2 style={headingStyle}>PeerPrep</h2>
+            </Link>
+            <div style={{ display: "flex", alignItems: "center", gap: "15px", marginLeft: "auto", marginRight: "20px" }}>
+                <Link to="/profile" style={{ color: "#333" }}>
+                    <FaUser size={30} />
+                </Link>
+                <button onClick={handleLogout} style={styles.logoutButton}>
+                    Logout
+                </button>
+            </div>
+        </div>
+    )
+}
 const navbarHomepageStyle = {
     border: "1px solid #ccc",
     padding: "5px",
@@ -186,8 +248,8 @@ const navbarHomepageStyle = {
     gap: "15px",
     marginLeft: "auto",
     marginRight: "20px",
-    alignItems: "center",                 
-    boxSizing: "border-box" as const,     
+    alignItems: "center",
+    boxSizing: "border-box" as const,
 };
 
 
