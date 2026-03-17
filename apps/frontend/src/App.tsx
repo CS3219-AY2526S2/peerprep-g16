@@ -159,6 +159,11 @@ function Appcontent() {
                         <AdminPage />
                     </ProtectedAdminRoute>
                 } />
+                <Route path="/admin/questions" element={
+                    <ProtectedAdminRoute>
+                        <AdminPage />
+                    </ProtectedAdminRoute>
+                } />
                 <Route path="/history"></Route>
                 <Route path="/collaboration"> </Route>
                 <Route path="*" element={<Navigate to="/" replace />} /> {/*for unknown URL, it will redirect to login page*/}

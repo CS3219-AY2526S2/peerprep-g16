@@ -19,9 +19,20 @@ function AdminPage() {
     const [sortOrder, setSortOrder] = useState("asc");
     const [questionSearchQuery, setQuestionSearchQuery] = useState("");
     const [filterTopic, setFilterTopic] = useState("all");
+    const [questions, setQuestions] = useState<any[]>([]);
+    const [filterDifficulty, setFilterDifficulty] = useState("all");
+    const [showAddQuestion, setShowAddQuestion] = useState(false);
+    const [newQuestion, setNewQuestion] = useState({
+        questionId: "",
+        title: "",
+        topic: "",
+        difficulty: "",
+        description: "",
+    });
 
     useEffect(() => {
         fetchUsers();
+        fetchQuestions();
     }, []);
 
     useEffect(() => {
@@ -102,6 +113,61 @@ function AdminPage() {
             if (valA > valB) return sortOrder === "asc" ? 1 : -1;
             return 0;
         });
+
+    const fetchQuestions = async () => {
+        try {
+            const response = await axios.get("http://localhost:3002/questions",
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setQuestions(response.data);
+        } catch (error: any) {
+            setQuestionError("Failed to fetch questions.");
+        }
+    };
+
+    const filteredQuestions = questions
+        .filter(q => filterTopic === "all" || q.topic === filterTopic)
+        .filter(q => filterDifficulty === "all" || q.difficulty === filterDifficulty)
+        .filter(q =>
+            q.questionId.toLowerCase().includes(questionSearchQuery.toLowerCase()) ||
+            q.title.toLowerCase().includes(questionSearchQuery.toLowerCase())
+        )
+        .sort((a, b) => {
+            const valA = a[sortField]?.toLowerCase() ?? "";
+            const valB = b[sortField]?.toLowerCase() ?? "";
+            if (valA < valB) return sortOrder === "asc" ? -1 : 1;
+            if (valA > valB) return sortOrder === "asc" ? 1 : -1;
+            return 0;
+        });
+
+    const handleDeleteQuestion = async (questionId: string) => {
+        const confirmed = window.confirm("Are you sure you want to delete this question?");
+        if (!confirmed) return;
+        try {
+            await axios.delete(`http://localhost:3002/questions/${questionId}`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setQuestionSuccess("Question deleted successfully!");
+            fetchQuestions();
+        } catch (error: any) {
+            setQuestionError("Failed to delete question.");
+        }
+    };
+
+    const handleAddQuestion = async () => {
+        try {
+            await axios.post("http://localhost:3002/questions",
+                newQuestion,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setQuestionSuccess("Question added successfully!");
+            setShowAddQuestion(false);
+            setNewQuestion({ questionId: "", title: "", topic: "", difficulty: "", description: "" });
+            fetchQuestions();
+        } catch (error: any) {
+            setQuestionError(error.response?.data?.message || "Failed to add question.");
+        }
+    };
 
     return (
         <div style={{ display: "flex", marginTop: "60px", minHeight: "100vh" }}>
@@ -218,36 +284,37 @@ function AdminPage() {
                                 <input
                                     type="text"
                                     placeholder="Search by question ID"
-                                    value={searchQuery}
+                                    value={questionSearchQuery}
                                     onChange={(e) => setQuestionSearchQuery(e.target.value)}
                                     style={styles.searchInput}
                                 />
                             </div>
                             <select
-                                value={filterAdmin}
+                                value={filterTopic}
                                 onChange={(e) => setFilterTopic(e.target.value)}
                                 style={styles.filterSelect}
                             >
                                 <option value="all">All Topics</option>
                             </select>
                             <button
-                                style={{ ...styles.addQuestionButton, marginLeft: "auto" }}
-                            >
+                                onClick={() => setShowAddQuestion(true)}
+                                style={{ ...styles.addQuestionButton, marginLeft: "auto" }}>
                                 + Add Question
                             </button>
                         </div>
 
                         <table style={styles.table}>
                             <colgroup>
-                                <col style={{ width: "25%" }} />  {/* Question ID */}
-                                <col style={{ width: "25%" }} />  {/* Question Title */}
-                                <col style={{ width: "25%" }} />  {/* Question Topic */}
-                                <col style={{ width: "25%" }} />  {/* Question Difficulty */}
+                                <col style={{ width: "15%" }} />
+                                <col style={{ width: "30%" }} />
+                                <col style={{ width: "20%" }} />
+                                <col style={{ width: "15%" }} />
+                                <col style={{ width: "20%" }} />
                             </colgroup>
                             <thead>
                                 <tr>
-                                    <th style={styles.th} onClick={() => handleSort("title")}>
-                                        ID {sortField === "id" ? (sortOrder === "asc" ? "↑" : "↓") : "↕"}
+                                    <th style={styles.th} onClick={() => handleSort("questionId")}>
+                                        ID {sortField === "questionId" ? (sortOrder === "asc" ? "↑" : "↓") : "↕"}
                                     </th>
                                     <th style={styles.th} onClick={() => handleSort("title")}>
                                         Title {sortField === "title" ? (sortOrder === "asc" ? "↑" : "↓") : "↕"}
@@ -258,15 +325,86 @@ function AdminPage() {
                                     <th style={styles.th} onClick={() => handleSort("difficulty")}>
                                         Difficulty {sortField === "difficulty" ? (sortOrder === "asc" ? "↑" : "↓") : "↕"}
                                     </th>
+                                    <th style={styles.th}>Action</th>
                                 </tr>
                             </thead>
+                            <tbody>
+                                {filteredQuestions.map((q) => (
+                                    <tr key={q.questionId} style={styles.tr}>
+                                        <td style={{ ...styles.td, cursor: "pointer", color: "#007BFF" }}
+                                            onClick={() => navigate(`/admin/questions/${q.questionId}`)}>
+                                            {q.questionId}
+                                        </td>
+                                        <td style={styles.td}>{q.title}</td>
+                                        <td style={styles.td}>{q.topic}</td>
+                                        <td style={styles.td}>{q.difficulty}</td>
+                                        <td style={styles.td}>
+                                            <button
+                                                onClick={() => handleDeleteQuestion(q.questionId)}
+                                                style={{ ...styles.promoteButton, backgroundColor: "red" }}>
+                                                Delete
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
                         </table>
                         {questionSuccess && <p style={{ color: "green", marginTop: "10px" }}>{questionSuccess}</p>}
                         {questionError && <p style={{ color: "red", marginTop: "10px" }}>{questionError}</p>}
                     </>
-                )}
-            </div>
-        </div>
+                )
+                }
+            </div >
+            {showAddQuestion && (
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modalBox}>
+                        <h3 style={{ marginBottom: "20px" }}>Add New Question</h3>
+                        <label style={styles.modalLabel}>
+                            Question ID:
+                            <input type="text" value={newQuestion.questionId}
+                                onChange={(e) => setNewQuestion({ ...newQuestion, questionId: e.target.value })}
+                                style={styles.modalInput} />
+                        </label>
+                        <label style={styles.modalLabel}>
+                            Title:
+                            <input type="text" value={newQuestion.title}
+                                onChange={(e) => setNewQuestion({ ...newQuestion, title: e.target.value })}
+                                style={styles.modalInput} />
+                        </label>
+                        <label style={styles.modalLabel}>
+                            Topic:
+                            <input type="text" value={newQuestion.topic}
+                                onChange={(e) => setNewQuestion({ ...newQuestion, topic: e.target.value })}
+                                style={styles.modalInput} />
+                        </label>
+                        <label style={styles.modalLabel}>
+                            Difficulty:
+                            <select value={newQuestion.difficulty}
+                                onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
+                                style={styles.modalInput}>
+                                <option value="">Select...</option>
+                                <option value="Easy">Easy</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Hard">Hard</option>
+                            </select>
+                        </label>
+                        <label style={styles.modalLabel}>
+                            Description:
+                            <textarea value={newQuestion.description}
+                                onChange={(e) => setNewQuestion({ ...newQuestion, description: e.target.value })}
+                                style={{ ...styles.modalInput, height: "100px", resize: "vertical" }} />
+                        </label>
+                        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                            <button onClick={handleAddQuestion} style={styles.promoteButton}>Submit</button>
+                            <button onClick={() => setShowAddQuestion(false)}
+                                style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div >
     );
 }
 
@@ -280,7 +418,7 @@ const styles: { [key: string]: React.CSSProperties } = {
     },
     sidebar: {
         width: "200px",
-        minHeight: "100vh",   
+        minHeight: "100vh",
         borderRight: "1px solid #000000",
         textAlign: "left" as const,
         left: 0,
@@ -374,6 +512,44 @@ const styles: { [key: string]: React.CSSProperties } = {
         fontWeight: "bold" as const,
         fontSize: "15px",
         cursor: "pointer",
+    },
+
+    modalOverlay: {
+        position: "fixed" as const,
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        backgroundColor: "rgba(0,0,0,0.5)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1000,
+    },
+    modalBox: {
+        backgroundColor: "white",
+        padding: "40px",
+        borderRadius: "12px",
+        width: "500px",
+        maxHeight: "80vh",
+        overflowY: "auto" as const,
+    },
+    modalLabel: {
+        display: "flex" as const,
+        flexDirection: "column" as const,
+        gap: "6px",
+        marginBottom: "16px",
+        fontSize: "14px",
+        fontWeight: "bold" as const,
+    },
+    modalInput: {
+        padding: "10px",
+        borderRadius: "8px",
+        border: "1px solid #ccc",
+        fontSize: "14px",
+        outline: "none",
+        width: "100%",
+        boxSizing: "border-box" as const,
     },
 };
 
