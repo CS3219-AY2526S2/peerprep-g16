@@ -28,7 +28,28 @@ function AdminPage() {
         topic: "",
         difficulty: "",
         description: "",
+        constraints: [] as string[],
+        examples: [] as { input: any; output: any; explanation?: string }[],
+        hints: [] as string[],
+        testCases: {
+            sample: [] as { input: any; expectedOutput: any }[],
+            hidden: [] as { input: any; expectedOutput: any }[]
+        }
     });
+    const [constraintInput, setConstraintInput] = useState("");
+    const [hintInput, setHintInput] = useState("");
+    const [sampleInput, setSampleInput] = useState("");
+    const [sampleOutput, setSampleOutput] = useState("");
+    const [hiddenInput, setHiddenInput] = useState("");
+    const [hiddenOutput, setHiddenOutput] = useState("");
+    const [showEditQuestion, setShowEditQuestion] = useState(false);
+    const [editQuestion, setEditQuestion] = useState<any>(null);
+    const [editConstraintInput, setEditConstraintInput] = useState("");
+    const [editHintInput, setEditHintInput] = useState("");
+    const [editSampleInput, setEditSampleInput] = useState("");
+    const [editSampleOutput, setEditSampleOutput] = useState("");
+    const [editHiddenInput, setEditHiddenInput] = useState("");
+    const [editHiddenOutput, setEditHiddenOutput] = useState("");
 
     useEffect(() => {
         fetchUsers();
@@ -155,6 +176,14 @@ function AdminPage() {
     };
 
     const handleAddQuestion = async () => {
+        if (!newQuestion.questionId || !newQuestion.title || !newQuestion.topic || !newQuestion.difficulty || !newQuestion.description) {
+            setQuestionError("Please fill in all required fields.");
+            return;
+        }
+        if (newQuestion.testCases.hidden.length === 0) {
+            setQuestionError("At least one hidden test case is required.");
+            return;
+        }
         try {
             await axios.post("http://localhost:3002/questions",
                 newQuestion,
@@ -162,10 +191,33 @@ function AdminPage() {
             );
             setQuestionSuccess("Question added successfully!");
             setShowAddQuestion(false);
-            setNewQuestion({ questionId: "", title: "", topic: "", difficulty: "", description: "" });
+            setNewQuestion({ questionId: "", title: "", topic: "", difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [] } });
             fetchQuestions();
         } catch (error: any) {
             setQuestionError(error.response?.data?.message || "Failed to add question.");
+        }
+    };
+
+    const handleEditQuestion = async () => {
+        if (!editQuestion.title || !editQuestion.topic || !editQuestion.difficulty || !editQuestion.description) {
+            setQuestionError("Please fill in all required fields.");
+            return;
+        }
+        if (editQuestion.testCases.hidden.length === 0) {
+            setQuestionError("At least one hidden test case is required.");
+            return;
+        }
+        try {
+            await axios.patch(`http://localhost:3002/questions/${editQuestion.questionId}`,
+                editQuestion,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setQuestionSuccess("Question updated successfully!");
+            setShowEditQuestion(false);
+            setEditQuestion(null);
+            fetchQuestions();
+        } catch (error: any) {
+            setQuestionError(error.response?.data?.message || "Failed to update question.");
         }
     };
 
@@ -339,11 +391,18 @@ function AdminPage() {
                                         <td style={styles.td}>{q.topic}</td>
                                         <td style={styles.td}>{q.difficulty}</td>
                                         <td style={styles.td}>
-                                            <button
-                                                onClick={() => handleDeleteQuestion(q.questionId)}
-                                                style={{ ...styles.promoteButton, backgroundColor: "red" }}>
-                                                Delete
-                                            </button>
+                                            <div style={{ display: "flex", gap: "8px" }}>
+                                                <button
+                                                    onClick={() => { setEditQuestion({ ...q }); setShowEditQuestion(true); setQuestionError(""); }}
+                                                    style={styles.promoteButton}>
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteQuestion(q.questionId)}
+                                                    style={{ ...styles.promoteButton, backgroundColor: "red" }}>
+                                                    Delete
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
@@ -359,24 +418,28 @@ function AdminPage() {
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalBox}>
                         <h3 style={{ marginBottom: "20px" }}>Add New Question</h3>
+
                         <label style={styles.modalLabel}>
                             Question ID:
                             <input type="text" value={newQuestion.questionId}
                                 onChange={(e) => setNewQuestion({ ...newQuestion, questionId: e.target.value })}
                                 style={styles.modalInput} />
                         </label>
+
                         <label style={styles.modalLabel}>
                             Title:
                             <input type="text" value={newQuestion.title}
                                 onChange={(e) => setNewQuestion({ ...newQuestion, title: e.target.value })}
                                 style={styles.modalInput} />
                         </label>
+
                         <label style={styles.modalLabel}>
                             Topic:
                             <input type="text" value={newQuestion.topic}
                                 onChange={(e) => setNewQuestion({ ...newQuestion, topic: e.target.value })}
                                 style={styles.modalInput} />
                         </label>
+
                         <label style={styles.modalLabel}>
                             Difficulty:
                             <select value={newQuestion.difficulty}
@@ -388,16 +451,291 @@ function AdminPage() {
                                 <option value="Hard">Hard</option>
                             </select>
                         </label>
+
                         <label style={styles.modalLabel}>
                             Description:
                             <textarea value={newQuestion.description}
                                 onChange={(e) => setNewQuestion({ ...newQuestion, description: e.target.value })}
-                                style={{ ...styles.modalInput, height: "100px", resize: "vertical" }} />
+                                style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }} />
                         </label>
+
+                        {/* Constraints */}
+                        <label style={styles.modalLabel}>
+                            Constraints:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={constraintInput}
+                                    onChange={(e) => setConstraintInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Add a constraint" />
+                                <button onClick={() => {
+                                    if (constraintInput) {
+                                        setNewQuestion({ ...newQuestion, constraints: [...newQuestion.constraints, constraintInput] });
+                                        setConstraintInput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {newQuestion.constraints.map((c, i) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>{c}</span>
+                                    <button onClick={() => setNewQuestion({ ...newQuestion, constraints: newQuestion.constraints.filter((_, idx) => idx !== i) })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
+                        </label>
+
+                        {/* Hints */}
+                        <label style={styles.modalLabel}>
+                            Hints:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={hintInput}
+                                    onChange={(e) => setHintInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Add a hint" />
+                                <button onClick={() => {
+                                    if (hintInput) {
+                                        setNewQuestion({ ...newQuestion, hints: [...newQuestion.hints, hintInput] });
+                                        setHintInput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {newQuestion.hints.map((h, i) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>{h}</span>
+                                    <button onClick={() => setNewQuestion({ ...newQuestion, hints: newQuestion.hints.filter((_, idx) => idx !== i) })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
+                        </label>
+
+                        {/* Sample Test Cases */}
+                        <label style={styles.modalLabel}>
+                            Sample Test Cases:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={sampleInput}
+                                    onChange={(e) => setSampleInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Input" />
+                                <input type="text" value={sampleOutput}
+                                    onChange={(e) => setSampleOutput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Expected Output" />
+                                <button onClick={() => {
+                                    if (sampleInput && sampleOutput) {
+                                        setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, sample: [...newQuestion.testCases.sample, { input: sampleInput, expectedOutput: sampleOutput }] } });
+                                        setSampleInput("");
+                                        setSampleOutput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {newQuestion.testCases.sample.map((s, i) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>Input: {s.input} | Output: {s.expectedOutput}</span>
+                                    <button onClick={() => setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, sample: newQuestion.testCases.sample.filter((_, idx) => idx !== i) } })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
+                        </label>
+
+                        {/* Hidden Test Cases */}
+                        <label style={styles.modalLabel}>
+                            Hidden Test Cases:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={hiddenInput}
+                                    onChange={(e) => setHiddenInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Input" />
+                                <input type="text" value={hiddenOutput}
+                                    onChange={(e) => setHiddenOutput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Expected Output" />
+                                <button onClick={() => {
+                                    if (hiddenInput && hiddenOutput) {
+                                        setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, hidden: [...newQuestion.testCases.hidden, { input: hiddenInput, expectedOutput: hiddenOutput }] } });
+                                        setHiddenInput("");
+                                        setHiddenOutput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {newQuestion.testCases.hidden.map((h, i) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>Input: {h.input} | Output: {h.expectedOutput}</span>
+                                    <button onClick={() => setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, hidden: newQuestion.testCases.hidden.filter((_, idx) => idx !== i) } })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
+                        </label>
+
                         <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                            {questionError && <p style={{ color: "red", marginBottom: "10px" }}>{questionError}</p>}
                             <button onClick={handleAddQuestion} style={styles.promoteButton}>Submit</button>
-                            <button onClick={() => setShowAddQuestion(false)}
-                                style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
+                            <button onClick={() => {
+                                setShowAddQuestion(false);
+                                setNewQuestion({ questionId: "", title: "", topic: "", difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [{ input: "", expectedOutput: "" }] } });
+                            }} style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {showEditQuestion && editQuestion && (
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modalBox}>
+                        <h3 style={{ marginBottom: "20px" }}>Edit Question</h3>
+
+                        <label style={styles.modalLabel}>
+                            Question ID:
+                            <input type="text" value={editQuestion.questionId}
+                                disabled
+                                style={{ ...styles.modalInput, backgroundColor: "#f5f5f5", cursor: "not-allowed" }} />
+                        </label>
+
+                        <label style={styles.modalLabel}>
+                            Title:
+                            <input type="text" value={editQuestion.title}
+                                onChange={(e) => setEditQuestion({ ...editQuestion, title: e.target.value })}
+                                style={styles.modalInput} />
+                        </label>
+
+                        <label style={styles.modalLabel}>
+                            Topic:
+                            <input type="text" value={editQuestion.topic}
+                                onChange={(e) => setEditQuestion({ ...editQuestion, topic: e.target.value })}
+                                style={styles.modalInput} />
+                        </label>
+
+                        <label style={styles.modalLabel}>
+                            Difficulty:
+                            <select value={editQuestion.difficulty}
+                                onChange={(e) => setEditQuestion({ ...editQuestion, difficulty: e.target.value })}
+                                style={styles.modalInput}>
+                                <option value="Easy">Easy</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Hard">Hard</option>
+                            </select>
+                        </label>
+
+                        <label style={styles.modalLabel}>
+                            Description:
+                            <textarea value={editQuestion.description}
+                                onChange={(e) => setEditQuestion({ ...editQuestion, description: e.target.value })}
+                                style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }} />
+                        </label>
+
+                        {/* Constraints */}
+                        <label style={styles.modalLabel}>
+                            Constraints:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={editConstraintInput}
+                                    onChange={(e) => setEditConstraintInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Add a constraint" />
+                                <button onClick={() => {
+                                    if (editConstraintInput) {
+                                        setEditQuestion({ ...editQuestion, constraints: [...(editQuestion.constraints || []), editConstraintInput] });
+                                        setEditConstraintInput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {(editQuestion.constraints || []).map((c: string, i: number) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>{c}</span>
+                                    <button onClick={() => setEditQuestion({ ...editQuestion, constraints: editQuestion.constraints.filter((_: any, idx: number) => idx !== i) })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
+                        </label>
+
+                        {/* Hints */}
+                        <label style={styles.modalLabel}>
+                            Hints:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={editHintInput}
+                                    onChange={(e) => setEditHintInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Add a hint" />
+                                <button onClick={() => {
+                                    if (editHintInput) {
+                                        setEditQuestion({ ...editQuestion, hints: [...(editQuestion.hints || []), editHintInput] });
+                                        setEditHintInput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {(editQuestion.hints || []).map((h: string, i: number) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>{h}</span>
+                                    <button onClick={() => setEditQuestion({ ...editQuestion, hints: editQuestion.hints.filter((_: any, idx: number) => idx !== i) })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
+                        </label>
+
+                        {/* Sample Test Cases */}
+                        <label style={styles.modalLabel}>
+                            Sample Test Cases:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={editSampleInput}
+                                    onChange={(e) => setEditSampleInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Input" />
+                                <input type="text" value={editSampleOutput}
+                                    onChange={(e) => setEditSampleOutput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Expected Output" />
+                                <button onClick={() => {
+                                    if (editSampleInput && editSampleOutput) {
+                                        setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, sample: [...(editQuestion.testCases.sample || []), { input: editSampleInput, expectedOutput: editSampleOutput }] } });
+                                        setEditSampleInput("");
+                                        setEditSampleOutput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {(editQuestion.testCases.sample || []).map((s: any, i: number) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>Input: {s.input} | Output: {s.expectedOutput}</span>
+                                    <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, sample: editQuestion.testCases.sample.filter((_: any, idx: number) => idx !== i) } })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
+                        </label>
+
+                        {/* Hidden Test Cases */}
+                        <label style={styles.modalLabel}>
+                            Hidden Test Cases: <span style={{ color: "red" }}>*</span>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={editHiddenInput}
+                                    onChange={(e) => setEditHiddenInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Input" />
+                                <input type="text" value={editHiddenOutput}
+                                    onChange={(e) => setEditHiddenOutput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Expected Output" />
+                                <button onClick={() => {
+                                    if (editHiddenInput && editHiddenOutput) {
+                                        setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, hidden: [...(editQuestion.testCases.hidden || []), { input: editHiddenInput, expectedOutput: editHiddenOutput }] } });
+                                        setEditHiddenInput("");
+                                        setEditHiddenOutput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {(editQuestion.testCases.hidden || []).map((h: any, i: number) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>Input: {h.input} | Output: {h.expectedOutput}</span>
+                                    <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, hidden: editQuestion.testCases.hidden.filter((_: any, idx: number) => idx !== i) } })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
+                        </label>
+
+                        {questionError && <p style={{ color: "red", marginBottom: "10px" }}>{questionError}</p>}
+                        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                            <button onClick={handleEditQuestion} style={styles.promoteButton}>Save</button>
+                            <button onClick={() => {
+                                setShowEditQuestion(false);
+                                setEditQuestion(null);
+                                setQuestionError("");
+                            }} style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
                                 Cancel
                             </button>
                         </div>
