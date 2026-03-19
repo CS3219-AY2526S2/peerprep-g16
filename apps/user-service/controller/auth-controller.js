@@ -23,9 +23,16 @@ export async function handleLogin(req, res) {
         id: user.id,
         isAdmin: user.isAdmin
       }, process.env.JWT_SECRET, {
-        expiresIn: "1d",
+        expiresIn: "15m",
       });
-      return res.status(200).json({ message: "User logged in", data: { accessToken, ...formatUserResponse(user) } });
+
+      const refreshToken = jwt.sign({
+        id: user.id
+      }, process.env.JWT_SECRET, {
+        expiresIn: "7d"
+      });
+
+      return res.status(200).json({ message: "User logged in", data: { accessToken, refreshToken, ...formatUserResponse(user) } });
     } catch (err) {
       return res.status(500).json({ message: err.message });
     }
