@@ -8,7 +8,6 @@ function AdminPage() {
     const user = stored ? JSON.parse(stored) : null;
     const token = user?.token;
     const [activeTab, setActiveTab] = React.useState("user");
-    const navigate = useNavigate();
     const [userSuccess, setUserSuccess] = useState("");
     const [userError, setUserError] = useState("");
     const [questionSuccess, setQuestionSuccess] = useState("");
@@ -182,8 +181,8 @@ function AdminPage() {
             setQuestionError("Please fill in all required fields.");
             return;
         }
-        if (newQuestion.testCases.hidden.length === 0) {
-            setQuestionError("At least one hidden test case is required.");
+        if (newQuestion.testCases.sample.length === 0) {
+            setQuestionError("At least one sample test case is required.");
             return;
         }
         try {
@@ -205,8 +204,8 @@ function AdminPage() {
             setQuestionError("Please fill in all required fields.");
             return;
         }
-        if (editQuestion.testCases.hidden.length === 0) {
-            setQuestionError("At least one hidden test case is required.");
+        if (editQuestion.testCases.sample.length === 0) {
+            setQuestionError("At least one sample test case is required.");
             return;
         }
         try {
