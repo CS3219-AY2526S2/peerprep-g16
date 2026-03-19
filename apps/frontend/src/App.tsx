@@ -76,6 +76,7 @@ function Appcontent() {
                 JSON.stringify({
                     userLogin: true,
                     token: response.data.data.accessToken,
+                    refreshToken: response.data.data.refreshToken,
                     id: response.data.data.id,
                     username: response.data.data.username,
                     email: response.data.data.email,
