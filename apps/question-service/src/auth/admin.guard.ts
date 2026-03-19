@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
+import * as jwt from 'jsonwebtoken';
 
 /**
  * Extended Express request type that includes authenticated user information.
@@ -16,10 +17,16 @@ import { Request } from 'express';
 type AuthenticatedRequest = Request & {
   user?: {
     id: string;
-    username: string;
-    email: string;
     isAdmin: boolean;
   };
+};
+
+/**
+ * Expected structure of the decoded JWT payload.
+ */
+type JwtPayload = {
+  id: string;
+  isAdmin: boolean;
 };
 
 /**
@@ -38,9 +45,9 @@ type VerifyTokenResponse = {
 /**
  * Guard that ensures the requesting user is authenticated and has admin privileges.
  *
- * This guard validates the Authorization header by calling the user-service
- * `/auth/verify-token` endpoint. If the token is valid and the user has
- * `isAdmin = true`, the request is allowed to proceed.
+ * This guard validates the Authorization header by verifying the JWT locally
+ * using the shared JWT_SECRET, without making any network calls to user-service.
+ * If the token is valid and the user has `isAdmin = true`, the request proceeds.
  *
  * The verified user information is attached to `request.user` so that downstream
  * controllers or services can access the authenticated user context.
@@ -52,81 +59,45 @@ export class AdminGuard implements CanActivate {
   /**
    * Determines whether the current request is allowed to proceed.
    *
-   * The guard extracts the Authorization header and attempts to validate the
-   * token against one of several possible user-service endpoints.
-   *
-   * If the token is valid and the user has admin privileges, the user payload
-   * is attached to the request object and access is granted.
+   * Extracts the Bearer token from the Authorization header, verifies its
+   * signature and expiry locally, then checks for admin privileges.
    *
    * @param context - NestJS execution context containing request information
-   * @returns true if the user is authenticated and authorized
-   * @throws UnauthorizedException if authentication fails
+   * @returns true if the user is authenticated and is an admin
+   * @throws UnauthorizedException if the token is missing, invalid, or expired
    * @throws ForbiddenException if the user is not an admin
-   * @throws ServiceUnavailableException if the authentication service cannot be reached
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const authorization = request.headers.authorization;
 
-    if (!authorization) {
+    if (!authorization?.startsWith('Bearer ')) {
       throw new UnauthorizedException('Authentication failed');
     }
 
-    const verifyTokenUrl = this.getVerifyTokenUrl();
+    const token = authorization.split(' ')[1];
+    const secret = this.configService.get<string>('JWT_SECRET');
+
+    if (!secret) {
+      throw new Error('JWT_SECRET not configured');
+    }
 
     try {
-      const response = await fetch(verifyTokenUrl, {
-        method: 'GET',
-        headers: {
-          authorization,
-        },
-      });
+      // Verifies signature and expiry locally — no call to user-service needed
+      const payload = jwt.verify(token, secret) as JwtPayload;
 
-      if (response.status === 401) {
-        throw new UnauthorizedException('Authentication failed');
+      if (!payload.isAdmin) {
+        throw new ForbiddenException('Not authorized to access this resource');
       }
 
-      if (!response.ok) {
-        throw new ServiceUnavailableException(
-          'Authentication service unavailable',
-        );
-      }
-
-      const payload = (await response.json()) as VerifyTokenResponse;
-
-      if (!payload.data?.isAdmin) {
-        throw new ForbiddenException(
-          'Not authorized to access this resource',
-        );
-      }
-
-      request.user = payload.data;
+      request.user = payload;
       return true;
     } catch (error) {
-      if (
-        error instanceof UnauthorizedException ||
-        error instanceof ForbiddenException
-      ) {
-        throw error;
+      if (error instanceof ForbiddenException) throw error;
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new UnauthorizedException('Token expired');
       }
+      throw new UnauthorizedException('Authentication failed');
     }
-
-    throw new ServiceUnavailableException('Authentication service unavailable');
-  }
-
-  /**
-   * Returns the configured user-service token verification endpoint.
-   *
-   * @returns Fully-qualified verification endpoint URL
-   * @throws Error if USER_SERVICE_URL is not configured
-   */
-  private getVerifyTokenUrl(): string {
-  const baseUrl = this.configService.get<string>('USER_SERVICE_URL');
-
-    if (!baseUrl) {
-      throw new Error('USER_SERVICE_URL not configured');
-    }
-
-    return `${baseUrl}/auth/verify-token`;
   }
 }
