@@ -24,6 +24,14 @@ export async function createUser(req, res) {
         return res.status(409).json({ message: "username or email already exists" });
       }
 
+      // Password validation
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({
+          message: "Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character" 
+        });
+      }
+
       const salt = bcrypt.genSaltSync(10);
       const hashedPassword = bcrypt.hashSync(password, salt);
       const encryptedEmail = encrypt(email.toLowerCase());
@@ -38,6 +46,9 @@ export async function createUser(req, res) {
     }
   } catch (err) {
     console.error(err);
+    if (err.code === 11000) {
+      return res.status(409).json({ message: "username or email already exists" });
+    }
     return res.status(500).json({ message: "Unknown error when creating new user!" });
   }
 }
@@ -74,41 +85,71 @@ export async function getAllUsers(req, res) {
 
 export async function updateUser(req, res) {
   try {
-    const { username, email, password } = req.body;
-    if (username || email || password) {
-      const userId = req.params.id;
-      if (!isValidObjectId(userId)) {
-        return res.status(404).json({ message: `User ${userId} not found` });
-      }
-      const user = await _findUserById(userId);
-      if (!user) {
-        return res.status(404).json({ message: `User ${userId} not found` });
-      }
-      if (username || email) {
-        let existingUser = await _findUserByUsername(username);
-        if (existingUser && existingUser.id !== userId) {
-          return res.status(409).json({ message: "username already exists" });
-        }
-        existingUser = await _findUserByEmail(email);
-        if (existingUser && existingUser.id !== userId) {
-          return res.status(409).json({ message: "email already exists" });
-        }
-      }
-
-      let hashedPassword;
-      if (password) {
-        const salt = bcrypt.genSaltSync(10);
-        hashedPassword = bcrypt.hashSync(password, salt);
-      }
-      const encryptedEmail = email ? encrypt(email.toLowerCase()) : undefined;
-      const updatedUser = await _updateUserById(userId, username, encryptedEmail, hashedPassword);
-      return res.status(200).json({
-        message: `Updated data for user ${userId}`,
-        data: formatUserResponse(updatedUser),
-      });
-    } else {
-      return res.status(400).json({ message: "No field to update: username and email and password are all missing!" });
+    const { username, email, password, currentPassword } = req.body;
+    
+    if (!username && !email && !password) {
+      return res.status(400).json({ message: "No field to update: username, email and password are all missing!" });
     }
+
+    const userId = req.params.id;
+    if (!isValidObjectId(userId)) {
+      return res.status(404).json({ message: `User ${userId} not found` });
+    }
+
+    const user = await _findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: `User ${userId} not found` });
+    }
+
+    // Email or password update requires current password verification
+    if (email || password) {
+      if (!currentPassword) {
+        return res.status(400).json({ message: "Current password is required to update email or password" });
+      }
+      const match = await bcrypt.compare(currentPassword, user.password);
+      if (!match) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+    }
+
+    // Username validation and uniqueness check
+    if (username) {
+      const existingUser = await _findUserByUsername(username);
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(409).json({ message: "Username already exists" });
+      }
+    }
+
+    // Email validation
+    if (email) {
+      if (!email.includes("@")) {
+        return res.status(400).json({ message: "Email must contain @" });
+      }
+      const encryptedEmail = encrypt(email.toLowerCase());
+      const existingUser = await _findUserByEmail(encryptedEmail);
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(409).json({ message: "Email already exists" });
+      }
+    }
+
+    // Password validation
+    let hashedPassword;
+    if (password) {
+      const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
+      if (!passwordRegex.test(password)) {
+        return res.status(400).json({ message: "Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character" });
+      }
+      const salt = bcrypt.genSaltSync(10);
+      hashedPassword = bcrypt.hashSync(password, salt);
+    }
+
+    const encryptedEmail = email ? encrypt(email.toLowerCase()) : undefined;
+    const updatedUser = await _updateUserById(userId, username, encryptedEmail, hashedPassword);
+    return res.status(200).json({
+      message: `Updated data for user ${userId}`,
+      data: formatUserResponse(updatedUser),
+    });
+
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "Unknown error when updating user!" });

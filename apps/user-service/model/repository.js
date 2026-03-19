@@ -24,13 +24,13 @@ export async function findUserById(userId) {
 }
 
 export async function findUserByUsername(username) {
-  return UserModel.findOne({ username });
+  return UserModel.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
 }
 
 export async function findUserByUsernameOrEmail(username, email) {
   return UserModel.findOne({
     $or: [
-      { username },
+      { username: { $regex: new RegExp(`^${username}$`, 'i') } },
       { email },
     ],
   });
