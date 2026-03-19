@@ -25,10 +25,12 @@ api.interceptors.response.use(
         });
 
         const newAccessToken = res.data.data.accessToken;
+        const newRefreshToken = res.data.data.refreshToken;
 
         localStorage.setItem("login", JSON.stringify({
           ...JSON.parse(localStorage.getItem("login")!),
           token: newAccessToken,
+          refreshToken: newRefreshToken,
         }));
 
         original.headers.Authorization = `Bearer ${newAccessToken}`;

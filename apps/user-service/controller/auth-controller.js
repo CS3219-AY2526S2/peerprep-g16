@@ -5,7 +5,7 @@ import {
   findUserByEmail as _findUserByEmail,
   findUserById as _findUserById,
   updateRefreshToken,
-} from "../model/repository.js"; 
+} from "../model/repository.js";
 import { formatUserResponse } from "./user-controller.js";
 
 export async function handleLogin(req, res) {
@@ -27,7 +27,7 @@ export async function handleLogin(req, res) {
         id: user.id,
         isAdmin: user.isAdmin
       }, process.env.JWT_SECRET, {
-        expiresIn: "15m",
+        expiresIn: "5m",
       });
 
       const refreshToken = jwt.sign({
@@ -71,10 +71,18 @@ export async function handleRefreshToken(req, res) {
     const accessToken = jwt.sign(
       { id: user.id, isAdmin: user.isAdmin },
       process.env.JWT_SECRET,
-      { expiresIn: "15m" }
+      { expiresIn: "5m" }
     );
 
-    return res.status(200).json({ data: { accessToken } });
+    const newRefreshToken = jwt.sign({
+      id: user.id
+    }, process.env.JWT_REFRESH_SECRET, {
+      expiresIn: "7d"
+    });
+
+    await updateRefreshToken(user.id, newRefreshToken);
+
+    return res.status(200).json({ data: { accessToken: accessToken, refreshToken: newRefreshToken } });
   } catch (err) {
     return res.status(401).json({ message: "Invalid or expired refresh token" });
   }
