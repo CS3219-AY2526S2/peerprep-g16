@@ -1,7 +1,7 @@
 import React from "react"
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios"
+import api from "../api/axiosInstance"
 
 function AdminPage() {
     const stored = localStorage.getItem("login");
@@ -75,7 +75,7 @@ function AdminPage() {
 
     const fetchUsers = async () => {
         try {
-            const response = await axios.get("http://localhost:3001/users",
+            const response = await api.get("http://localhost:3001/users",
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setUsers(response.data.data);
@@ -88,7 +88,7 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to promote this user to admin?");
         if (!confirmed) return;
         try {
-            await axios.patch(`http://localhost:3001/users/${userId}/privilege`,
+            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
                 { isAdmin: true },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -107,7 +107,7 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to demote this admin to user?");
         if (!confirmed) return;
         try {
-            await axios.patch(`http://localhost:3001/users/${userId}/privilege`,
+            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
                 { isAdmin: false },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -138,7 +138,7 @@ function AdminPage() {
 
     const fetchQuestions = async () => {
         try {
-            const response = await axios.get("http://localhost:3002/questions",
+            const response = await api.get("http://localhost:3002/questions",
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestions(response.data);
@@ -166,7 +166,7 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to delete this question?");
         if (!confirmed) return;
         try {
-            await axios.delete(`http://localhost:3002/questions/${questionId}`,
+            await api.delete(`http://localhost:3002/questions/${questionId}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestionSuccess("Question deleted successfully!");
@@ -186,7 +186,7 @@ function AdminPage() {
             return;
         }
         try {
-            await axios.post("http://localhost:3002/questions",
+            await api.post("http://localhost:3002/questions",
                 newQuestion,
                 { headers: { Authorization: `Bearer ${token}` } }
             );

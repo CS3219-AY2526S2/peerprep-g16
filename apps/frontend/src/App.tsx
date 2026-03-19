@@ -6,7 +6,7 @@ import Register from "./pages/register"
 import Homepage from "./pages/homepage"
 import AdminPage from "./pages/adminPage"
 import Profile from "./pages/profile"
-import axios from "axios";
+import api from "./api/axiosInstance";
 
 function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("login");
@@ -65,7 +65,7 @@ function Appcontent() {
     const login = async (event: any) => {
         event.preventDefault();
         try {
-            const response = await axios.post("http://localhost:3001/auth/login", {
+            const response = await api.post("http://localhost:3001/auth/login", {
                 email,
                 password,
             });
@@ -76,6 +76,7 @@ function Appcontent() {
                 JSON.stringify({
                     userLogin: true,
                     token: response.data.data.accessToken,
+                    refreshToken: response.data.data.refreshToken,
                     id: response.data.data.id,
                     username: response.data.data.username,
                     email: response.data.data.email,

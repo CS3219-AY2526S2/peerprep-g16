@@ -34,6 +34,10 @@ const UserModelSchema = new Schema({
     type: Date,
     default: null,
   },
+  refreshToken: {
+    type: String,
+    default: null
+  },
 });
 
 export default mongoose.model("UserModel", UserModelSchema);
