@@ -49,3 +49,27 @@ export async function handleVerifyToken(req, res) {
     return res.status(500).json({ message: err.message });
   }
 }
+
+export async function handleRefreshToken(req, res) {
+  const { refreshToken } = req.body
+  if (!refreshToken) return res.status(401).json({ message: "No refresh token" });
+
+  try {
+    const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const user = await findUserById(payload.id);
+
+    if (!user || user.refreshToken !== refreshToken) {
+      return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    const accessToken = jwt.sign(
+      { id: user.id, isAdmin: user.isAdmin },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    return res.status(200).json({ data: { accessToken } });
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid or expired refresh token" });
+  }
+}
