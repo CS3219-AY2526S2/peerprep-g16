@@ -8,7 +8,6 @@ function AdminPage() {
     const user = stored ? JSON.parse(stored) : null;
     const token = user?.token;
     const [activeTab, setActiveTab] = React.useState("user");
-    const navigate = useNavigate();
     const [userSuccess, setUserSuccess] = useState("");
     const [userError, setUserError] = useState("");
     const [questionSuccess, setQuestionSuccess] = useState("");
@@ -25,7 +24,7 @@ function AdminPage() {
     const [newQuestion, setNewQuestion] = useState({
         questionId: "",
         title: "",
-        topic: "",
+        topic: [] as string[],
         difficulty: "",
         description: "",
         constraints: [] as string[],
@@ -36,6 +35,8 @@ function AdminPage() {
             hidden: [] as { input: any; expectedOutput: any }[]
         }
     });
+    const [topicInput, setTopicInput] = useState("");
+    const [editTopicInput, setEditTopicInput] = useState("");
     const [constraintInput, setConstraintInput] = useState("");
     const [hintInput, setHintInput] = useState("");
     const [sampleInput, setSampleInput] = useState("");
@@ -147,7 +148,7 @@ function AdminPage() {
     };
 
     const filteredQuestions = questions
-        .filter(q => filterTopic === "all" || q.topic === filterTopic)
+        .filter(q => filterTopic === "all" || (Array.isArray(q.topic) ? q.topic.includes(filterTopic) : q.topic === filterTopic))
         .filter(q => filterDifficulty === "all" || q.difficulty === filterDifficulty)
         .filter(q =>
             q.questionId.toLowerCase().includes(questionSearchQuery.toLowerCase()) ||
@@ -180,8 +181,8 @@ function AdminPage() {
             setQuestionError("Please fill in all required fields.");
             return;
         }
-        if (newQuestion.testCases.hidden.length === 0) {
-            setQuestionError("At least one hidden test case is required.");
+        if (newQuestion.testCases.sample.length === 0) {
+            setQuestionError("At least one sample test case is required.");
             return;
         }
         try {
@@ -191,7 +192,7 @@ function AdminPage() {
             );
             setQuestionSuccess("Question added successfully!");
             setShowAddQuestion(false);
-            setNewQuestion({ questionId: "", title: "", topic: "", difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [] } });
+            setNewQuestion({ questionId: "", title: "", topic: [], difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [] } });
             fetchQuestions();
         } catch (error: any) {
             setQuestionError(error.response?.data?.message || "Failed to add question.");
@@ -203,8 +204,8 @@ function AdminPage() {
             setQuestionError("Please fill in all required fields.");
             return;
         }
-        if (editQuestion.testCases.hidden.length === 0) {
-            setQuestionError("At least one hidden test case is required.");
+        if (editQuestion.testCases.sample.length === 0) {
+            setQuestionError("At least one sample test case is required.");
             return;
         }
         try {
@@ -344,9 +345,22 @@ function AdminPage() {
                                 style={styles.filterSelect}
                             >
                                 <option value="all">All Topics</option>
+                                {[...new Set(questions.flatMap(q => Array.isArray(q.topic) ? q.topic : [q.topic]))].map(topic => (
+                                    <option key={topic} value={topic}>{topic}</option>
+                                ))}
+                            </select>
+                            <select
+                                value={filterDifficulty}
+                                onChange={(e) => setFilterDifficulty(e.target.value)}
+                                style={styles.filterSelect}
+                            >
+                                <option value="all">All Difficulties</option>
+                                <option value="Easy">Easy</option>
+                                <option value="Medium">Medium</option>
+                                <option value="Hard">Hard</option>
                             </select>
                             <button
-                                onClick={() => setShowAddQuestion(true)}
+                                onClick={() => { setShowAddQuestion(true); setQuestionError(""); }}
                                 style={{ ...styles.addQuestionButton, marginLeft: "auto" }}>
                                 + Add Question
                             </button>
@@ -382,7 +396,7 @@ function AdminPage() {
                                     <tr key={q.questionId} style={styles.tr}>
                                         <td style={styles.td}>{q.questionId}</td>
                                         <td style={styles.td}>{q.title}</td>
-                                        <td style={styles.td}>{q.topic}</td>
+                                        <td style={styles.td}>{Array.isArray(q.topic) ? q.topic.join(", ") : q.topic}</td>
                                         <td style={styles.td}>{q.difficulty}</td>
                                         <td style={styles.td}>
                                             <div style={{ display: "flex", gap: "8px" }}>
@@ -428,12 +442,27 @@ function AdminPage() {
                         </label>
 
                         <label style={styles.modalLabel}>
-                            Topic:
-                            <input type="text" value={newQuestion.topic}
-                                onChange={(e) => setNewQuestion({ ...newQuestion, topic: e.target.value })}
-                                style={styles.modalInput} />
+                            Topics:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={topicInput}
+                                    onChange={(e) => setTopicInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Add a topic" />
+                                <button onClick={() => {
+                                    if (topicInput) {
+                                        setNewQuestion({ ...newQuestion, topic: [...newQuestion.topic, topicInput] });
+                                        setTopicInput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {newQuestion.topic.map((t, i) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>{t}</span>
+                                    <button onClick={() => setNewQuestion({ ...newQuestion, topic: newQuestion.topic.filter((_, idx) => idx !== i) })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
                         </label>
-
                         <label style={styles.modalLabel}>
                             Difficulty:
                             <select value={newQuestion.difficulty}
@@ -564,7 +593,7 @@ function AdminPage() {
                             <button onClick={handleAddQuestion} style={styles.promoteButton}>Submit</button>
                             <button onClick={() => {
                                 setShowAddQuestion(false);
-                                setNewQuestion({ questionId: "", title: "", topic: "", difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [{ input: "", expectedOutput: "" }] } });
+                                setNewQuestion({ questionId: "", title: "", topic: [], difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [] } });
                             }} style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
                                 Cancel
                             </button>
@@ -592,10 +621,32 @@ function AdminPage() {
                         </label>
 
                         <label style={styles.modalLabel}>
-                            Topic:
-                            <input type="text" value={editQuestion.topic}
-                                onChange={(e) => setEditQuestion({ ...editQuestion, topic: e.target.value })}
-                                style={styles.modalInput} />
+                            Topics:
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                <input type="text" value={editTopicInput}
+                                    onChange={(e) => setEditTopicInput(e.target.value)}
+                                    style={{ ...styles.modalInput, flex: 1 }}
+                                    placeholder="Add a topic" />
+                                <button onClick={() => {
+                                    if (editTopicInput) {
+                                        setEditQuestion({
+                                            ...editQuestion,
+                                            topic: [...(Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]), editTopicInput]
+                                        });
+                                        setEditTopicInput("");
+                                    }
+                                }} style={styles.promoteButton}>Add</button>
+                            </div>
+                            {(Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]).map((t: string, i: number) => (
+                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                    <span>{t}</span>
+                                    <button onClick={() => setEditQuestion({
+                                        ...editQuestion,
+                                        topic: (Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]).filter((_: any, idx: number) => idx !== i)
+                                    })}
+                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                </div>
+                            ))}
                         </label>
 
                         <label style={styles.modalLabel}>
