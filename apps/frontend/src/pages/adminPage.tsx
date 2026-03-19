@@ -209,7 +209,7 @@ function AdminPage() {
             return;
         }
         try {
-            await axios.patch(`http://localhost:3002/questions/${editQuestion.questionId}`,
+            await api.patch(`http://localhost:3002/questions/${editQuestion.questionId}`,
                 editQuestion,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
