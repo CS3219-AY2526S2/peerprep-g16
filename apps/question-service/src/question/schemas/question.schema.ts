@@ -52,8 +52,13 @@ export class Question {
   @Prop({ required: true, trim: true })
   title: string;
 
-  @Prop({ required: true, trim: true, index: true })
-  topic: string;
+  @Prop({ 
+    required: true, 
+    type: [{type: String, trim: true}], 
+    index: true, 
+    validate: [(val: string[]) => val.length > 0, 'At least one topic is required'] 
+  })
+  topic: string[];
 
   @Prop({
     required: true,
@@ -76,14 +81,15 @@ export class Question {
 
   @Prop({
     type: {
-      sample: { type: [TestCaseSchema], default: [] },
-      hidden: {
+      sample: {
         type: [TestCaseSchema],
         required: true,
-        validate: {
-          validator: (value: TestCase[]) => Array.isArray(value) && value.length > 0,
-          message: 'At least one hidden test case is required',
-        },
+        validate: [(val: TestCase[]) => val.length > 0, 'At least one sample test case is required'],
+        default: undefined,
+      },
+      hidden: {
+        type: [TestCaseSchema],
+        default: [],
       },
     },
     required: true,
