@@ -69,3 +69,11 @@ export async function updateUserPrivilegeById(userId, isAdmin) {
 export async function deleteUserById(userId) {
   return UserModel.findByIdAndDelete(userId);
 }
+
+export async function updateRefreshToken(userId, refreshToken) {
+  return UserModel.findByIdAndUpdate(
+    userId,
+    { $set: { refreshToken } },
+    { new: true }
+  );
+}
