@@ -1,7 +1,7 @@
 import React from "react"
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios"
+import api from "../api/axiosInstance"
 
 function Profile() {
     const stored = localStorage.getItem("login");
@@ -28,7 +28,7 @@ function Profile() {
         else if (!handleEmailValidation()) return
 
         try {
-            await axios.patch(`http://localhost:3001/users/${user?.id}`,
+            await api.patch(`http://localhost:3001/users/${user?.id}`,
                 { email: newEmail },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
@@ -67,7 +67,7 @@ function Profile() {
         else if (!handleConfirmPasswordValidation()) return
 
         try {
-            await axios.patch(`http://localhost:3001/users/${user?.id}`,
+            await api.patch(`http://localhost:3001/users/${user?.id}`,
                 { password: newPassword },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
@@ -135,7 +135,7 @@ function Profile() {
         if (!usernameChange()) return
 
         try {
-            await axios.patch(`http://localhost:3001/users/${user?.id}`,
+            await api.patch(`http://localhost:3001/users/${user?.id}`,
                 { username: newUsername },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
@@ -170,7 +170,7 @@ function Profile() {
         if (!confirmed) return;
 
         try {
-            await axios.delete(`http://localhost:3001/users/${user?.id}`,
+            await api.delete(`http://localhost:3001/users/${user?.id}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             )
             localStorage.removeItem("login");
