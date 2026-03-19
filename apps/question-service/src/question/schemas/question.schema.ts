@@ -52,7 +52,7 @@ export class Question {
   @Prop({ required: true, trim: true })
   title: string;
 
-  @Prop({ required: true, trim: true, index: true })
+  @Prop({ required: true, type: [String], index: true })
   topic: string[];
 
   @Prop({
