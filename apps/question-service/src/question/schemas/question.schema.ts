@@ -53,7 +53,7 @@ export class Question {
   title: string;
 
   @Prop({ required: true, trim: true, index: true })
-  topic: string;
+  topic: string[];
 
   @Prop({
     required: true,
