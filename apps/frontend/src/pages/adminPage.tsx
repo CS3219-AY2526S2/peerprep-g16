@@ -286,10 +286,7 @@ function AdminPage() {
                             <tbody>
                                 {filteredUsers.map((u) => (
                                     <tr key={u.id} style={styles.tr}>
-                                        <td style={{ ...styles.td, fontWeight: "bold", cursor: "pointer", color: "#007BFF" }}
-                                            onClick={() => navigate(`/admin/users/${u.id}`)}>
-                                            {u.id}
-                                        </td>
+                                        <td style={styles.td}>{u.id}</td>
                                         <td style={{ ...styles.td, fontWeight: "bold" }}>{u.username}</td>
                                         <td style={styles.td}>{u.email}</td>
                                         <td style={styles.td}>{u.isAdmin ? "Admin" : "User"}</td>
@@ -383,10 +380,7 @@ function AdminPage() {
                             <tbody>
                                 {filteredQuestions.map((q) => (
                                     <tr key={q.questionId} style={styles.tr}>
-                                        <td style={{ ...styles.td, cursor: "pointer", color: "#007BFF" }}
-                                            onClick={() => navigate(`/admin/questions/${q.questionId}`)}>
-                                            {q.questionId}
-                                        </td>
+                                        <td style={styles.td}>{q.questionId}</td>
                                         <td style={styles.td}>{q.title}</td>
                                         <td style={styles.td}>{q.topic}</td>
                                         <td style={styles.td}>{q.difficulty}</td>
