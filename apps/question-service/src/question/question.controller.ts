@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AdminGuard } from '../auth/admin.guard';
+import { UserGuard } from '../auth/user.guard';
 import { QuestionService } from './question.service';
 
 /**
@@ -20,6 +21,7 @@ export class QuestionController {
    * @param difficulty Optional difficulty query parameter
    * @returns List of matching questions
    */
+  @UseGuards(UserGuard)
   @Get()
   async findAll(
     @Query('topic') topic?: string,
