@@ -14,7 +14,7 @@ interface NewQuestion {
     difficulty: string;
     description: string;
     constraints: string[];
-    examples: { input: any; output: any; explanation?: string }[];  // ← ADD THIS
+    examples: { input: any; output: any; explanation?: string }[]; 
     hints: string[];
     testCases: {
         sample: { input: any; expectedOutput: any }[];
