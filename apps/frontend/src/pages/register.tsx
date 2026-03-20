@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
+import webStyles from "../components/styles";
 
 function Register() {
     const [username, setUsername] = useState("");
@@ -157,70 +158,6 @@ function Register() {
         </div>
     );
 }
-const styles = {
-    container: {
-        marginTop: "50px",
-        textAlign: "center" as const,
-        maxWidth: "280px",
-        marginLeft: "auto",
-        marginRight: "auto",
-        display: "flex",
-        flexDirection: "column" as const,
-        alignItems: "center" as const,
-        justifyContent: "flex-start" as const,  // add this
-    },
-    heading: {
-        fontSize: "24px",
-        color: "#333",
-    },
-    error: {
-        color: "red",
-    },
-    input: {
-        marginBottom: "5px",
-        borderRadius: "10px",
-        width: "250px",
-        padding: "12px",
-        border: "1px solid #ccc",
-        outline: "none",
-        boxSizing: "border-box" as const,
-    },
-    label: {
-        marginBottom: "5px",
-        textAlign: "left" as const,
-        display: "block",
-        width: "250px",
-    },
-    passwordBorder: {
-        backgroundColor: "#f5f5f5",
-        border: "1px solid #ddd",
-        borderRadius: "4px",
-        padding: "12px",
-        margin: "10px 0",
-        fontSize: "14px",
-        color: "#666",
-        textAlign: "left" as const
-    },
-
-    passwordRequirements: {
-        margin: "5px 0",
-        paddingLeft: "20px",
-    },
-
-    button: {
-        padding: "10px 20px",
-        backgroundColor: "white",
-        border: "2px solid #333",
-        borderRadius: "20px",
-        fontWeight: "bold" as const,
-        fontSize: "15px",
-        cursor: "pointer",
-    },
-    link: {
-        textDecoration: "none",
-        color: "#007BFF",
-    },
-
-};
+const styles = webStyles;
 
 export default Register;

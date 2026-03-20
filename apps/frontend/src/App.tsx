@@ -7,6 +7,7 @@ import Homepage from "./pages/homepage"
 import AdminPage from "./pages/adminPage"
 import Profile from "./pages/profile"
 import api from "./api/axiosInstance";
+import webStyles from './components/styles'
 
 function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("login");
@@ -267,77 +268,6 @@ const headingStyle = {
     frontWeight: "bold",
 };
 
-const styles = {
-    container: {
-        marginTop: "100px",
-        textAlign: "center" as const,
-        maxWidth: "280px",
-        marginLeft: "auto",
-        marginRight: "auto",
-        display: "flex",
-        flexDirection: "column" as const,
-        alignItems: "center" as const,
-    },
-    navbarContainer: {
-        border: "1px solid #ccc",
-        padding: "5px",
-        width: "100%",
-        borderRadius: "8px",
-        backgroundColor: "#ffffff",
-        boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.2)",
-        position: "fixed" as const,
-        top: 0,
-        left: 0,
-    },
-    heading: {
-        fontSize: "24px",
-        color: "#333",
-    },
-    error: {
-        color: "red",
-    },
-    input: {
-        marginBottom: "5px",
-        borderRadius: "10px",
-        width: "250px",
-        padding: "12px",
-        border: "1px solid #ccc",
-        outline: "none",
-        boxSizing: "border-box" as const,
-    },
-    label: {
-        marginBottom: "5px",
-        textAlign: "left" as const,
-        display: "block",
-        width: "250px",
-    },
-    form: {
-        maxWidth: "300px",
-        margin: "0 auto",
-    },
-
-    button: {
-        padding: "10px 20px",
-        backgroundColor: "white",
-        border: "2px solid #333",
-        borderRadius: "20px",
-        fontWeight: "bold" as const,
-        fontSize: "15px",
-        cursor: "pointer",
-    },
-    logoutButton: {
-        padding: "10px 20px",
-        backgroundColor: "white",
-        border: "2px solid #333",
-        borderRadius: "20px",
-        fontWeight: "bold" as const,
-        fontSize: "15px",
-        cursor: "pointer",
-    },
-    link: {
-        textDecoration: "none",
-        color: "#007BFF",
-    },
-};
+const styles = webStyles
 
 export default App;
