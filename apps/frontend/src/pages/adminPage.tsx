@@ -1,6 +1,5 @@
 import React from "react"
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
 import UserTable from "../components/userTable";
 import QuestionTable from "../components/questionTable";

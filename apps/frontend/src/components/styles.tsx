@@ -141,6 +141,152 @@ const webStyles: { [key: string]: React.CSSProperties } = {
         width: "100%",
         boxSizing: "border-box" as const,
     },
+
+    container: {
+        marginTop: "100px",
+        textAlign: "center" as const,
+        maxWidth: "280px",
+        marginLeft: "auto",
+        marginRight: "auto",
+        display: "flex",
+        flexDirection: "column" as const,
+        alignItems: "center" as const,
+    },
+    navbarContainer: {
+        border: "1px solid #ccc",
+        padding: "5px",
+        width: "100%",
+        borderRadius: "8px",
+        backgroundColor: "#ffffff",
+        boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.2)",
+        position: "fixed" as const,
+        top: 0,
+        left: 0,
+    },
+
+    error: {
+        color: "red",
+    },
+    input: {
+        marginBottom: "5px",
+        borderRadius: "10px",
+        width: "250px",
+        padding: "12px",
+        border: "1px solid #ccc",
+        outline: "none",
+        boxSizing: "border-box" as const,
+    },
+    label: {
+        marginBottom: "5px",
+        textAlign: "left" as const,
+        display: "block",
+        width: "250px",
+    },
+    form: {
+        maxWidth: "300px",
+        margin: "0 auto",
+    },
+
+    button: {
+        padding: "10px 20px",
+        backgroundColor: "white",
+        border: "2px solid #333",
+        borderRadius: "20px",
+        fontWeight: "bold" as const,
+        fontSize: "15px",
+        cursor: "pointer",
+    },
+    logoutButton: {
+        padding: "10px 20px",
+        backgroundColor: "white",
+        border: "2px solid #333",
+        borderRadius: "20px",
+        fontWeight: "bold" as const,
+        fontSize: "15px",
+        cursor: "pointer",
+    },
+    link: {
+        textDecoration: "none",
+        color: "#007BFF",
+    },
+
+    passwordBorder: {
+        backgroundColor: "#f5f5f5",
+        border: "1px solid #ddd",
+        borderRadius: "4px",
+        padding: "12px",
+        margin: "10px 0",
+        fontSize: "14px",
+        color: "#666",
+        textAlign: "left" as const,
+        width: "460px",
+        marginBottom: "30px"
+    },
+
+    passwordRequirements: {
+        margin: "5px 0",
+        paddingLeft: "20px",
+    },
+
+
+    important: {
+        fontSize: "16px",
+        color: "red",
+        marginTop: "0",
+        textAlign: "left" as const,
+
+    },
+
+    page: {
+        marginTop: "80px",
+        padding: "30px 40px",
+    },
+
+    sectionTitle: {
+        fontSize: "18px",
+        fontWeight: "bold" as const,
+        marginBottom: "20px",
+        marginLeft: "20px",
+        marginRight: "20px",
+        textAlign: "left" as const,
+    },
+    filtersRow: {
+        display: "flex",
+        gap: "40px",
+        alignItems: "flex-start",
+        marginBottom: "30px",
+        justifyContent: "space-between",
+    },
+    filterGroup: {
+        display: "flex",
+        flexDirection: "column" as const,
+        gap: "8px",
+        flex: 1,
+    },
+    filterLabel: {
+        fontSize: "16px",
+        fontWeight: "bold" as const,
+        textAlign: "left" as const,
+        display: "block" as const,
+    },
+    select: {
+        padding: "12px 16px",
+        borderRadius: "10px",
+        border: "1px solid #ccc",
+        fontSize: "15px",
+        width: "100%",
+        backgroundColor: "white",
+        cursor: "pointer",
+    },
+    matchmakeButton: {
+        padding: "10px 20px",
+        backgroundColor: "white",
+        border: "2px solid #333",
+        borderRadius: "20px",
+        fontWeight: "bold" as const,
+        fontSize: "15px",
+        cursor: "pointer",
+    },
 };
 
 export default webStyles;

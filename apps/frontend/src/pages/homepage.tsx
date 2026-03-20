@@ -1,4 +1,5 @@
 import React from "react";
+import webStyles from "../components/styles";
 
 function Homepage() {
     const stored = localStorage.getItem("login");
@@ -80,108 +81,6 @@ function Homepage() {
     );
 }
 
-const styles = {
-    container: {
-        marginTop: "100px",
-        textAlign: "center" as const,
-        maxWidth: "280px",
-        marginLeft: "auto",
-        marginRight: "auto",
-    },
-    heading: {
-        fontSize: "24px",
-        color: "#333",
-        margin: "20px 0 20px 20px"
-    },
-
-    important: {
-        fontSize: "16px",
-        color: "red",
-        marginTop: "0",
-        textAlign: "left" as const,
-
-    },
-    input: {
-        marginBottom: "5px",
-        borderRadius: "10px",
-        width: "250px",
-        padding: "12px",
-    },
-    label: {
-        marginBottom: "5px",
-        textAlign: "left" as const,
-        display: "block",
-        width: "250px",
-    },
-    form: {
-        maxWidth: "300px",
-        margin: "0 auto",
-    },
-
-    button: {
-        width: "auto",
-        padding: "10px",
-        backgroundColor: "#007BFF",
-        color: "white",
-        border: "none",
-        cursor: "pointer",
-        marginBottom: "10px",
-    },
-    link: {
-        textDecoration: "none",
-        color: "#007BFF",
-    },
-    page: {
-        marginTop: "80px",
-        padding: "30px 40px",
-    },
-
-    sectionTitle: {
-        fontSize: "18px",
-        fontWeight: "bold" as const,
-        marginBottom: "20px",
-        marginLeft: "20px",
-        marginRight: "20px",
-        align: "Left",
-    },
-    filtersRow: {
-        display: "flex",
-        gap: "40px",
-        alignItems: "flex-start",
-        marginBottom: "30px",
-        justifyContent: "space-between",
-    },
-    filterGroup: {
-        display: "flex",
-        flexDirection: "column" as const,
-        gap: "8px",
-        flex: 1,
-    },
-    filterLabel: {
-        fontSize: "16px",
-        fontWeight: "bold" as const,
-        textAlign: "left" as const,
-        display: "block" as const,
-    },
-    select: {
-        padding: "12px 16px",
-        borderRadius: "10px",
-        border: "1px solid #ccc",
-        fontSize: "15px",
-        width: "100%",
-        backgroundColor: "white",
-        cursor: "pointer",
-    },
-    matchmakeButton: {
-        padding: "10px 20px",
-        backgroundColor: "white",
-        border: "2px solid #333",
-        borderRadius: "20px",
-        fontWeight: "bold" as const,
-        fontSize: "15px",
-        cursor: "pointer",
-    },
-
-};
+const styles = webStyles;
 
 export default Homepage

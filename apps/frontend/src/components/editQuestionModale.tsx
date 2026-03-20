@@ -1,4 +1,5 @@
 import React from 'react';
+import webStyles from './styles';
 
 interface TestCase {
     input: any;
@@ -285,53 +286,6 @@ function EditQuestionModal({
     );
 }
 
-const styles: { [key: string]: React.CSSProperties } = {
-    modalOverlay: {
-        position: "fixed" as const,
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,
-    },
-    modalBox: {
-        backgroundColor: "white",
-        padding: "40px",
-        borderRadius: "12px",
-        width: "500px",
-        maxHeight: "80vh",
-        overflowY: "auto" as const,
-    },
-    modalLabel: {
-        display: "flex" as const,
-        flexDirection: "column" as const,
-        gap: "6px",
-        marginBottom: "16px",
-        fontSize: "14px",
-        fontWeight: "bold" as const,
-    },
-    modalInput: {
-        padding: "10px",
-        borderRadius: "8px",
-        border: "1px solid #ccc",
-        fontSize: "14px",
-        outline: "none",
-        width: "100%",
-        boxSizing: "border-box" as const,
-    },
-    promoteButton: {
-        padding: "6px 12px",
-        backgroundColor: "#007BFF",
-        color: "white",
-        border: "none",
-        borderRadius: "6px",
-        cursor: "pointer",
-        fontSize: "13px",
-    },
-};
+const styles = webStyles;
 
 export default EditQuestionModal;

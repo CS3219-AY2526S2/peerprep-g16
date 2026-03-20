@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
+import webStyles from "./styles";
 
 interface QuestionTableProps {
     questions: any[];
@@ -124,82 +125,6 @@ function QuestionTable({ questions, filteredQuestions, questionSearchQuery, setQ
         </>
     );
 }
-const styles: { [key: string]: React.CSSProperties } = {
-    heading: {
-        fontSize: "20px",
-        color: "#333",
-        textAlign: "left",
-        padding: 0,
-        margin: "20px 0 20px 20px"
-    },
-    searchBox: {
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        border: "1px solid #ccc",
-        borderRadius: "20px",
-        padding: "8px 16px",
-        backgroundColor: "white",
-        width: "300px",
-    },
-    searchInput: {
-        border: "none",
-        outline: "none",
-        fontSize: "14px",
-        width: "100%",
-    },
-    filterSelect: {
-        padding: "8px 16px",
-        borderRadius: "20px",
-        border: "1px solid #ccc",
-        fontSize: "14px",
-        cursor: "pointer",
-        backgroundColor: "white",
-    },
-    table: {
-        width: "100%",
-        borderCollapse: "collapse",
-        backgroundColor: "white",
-        borderRadius: "8px",
-        overflow: "hidden",
-        tableLayout: "fixed",
-
-    },
-    th: {
-        textAlign: "left",
-        padding: "12px 16px",
-        borderBottom: "2px solid #ddd",
-        fontSize: "14px",
-        color: "#666",
-        whiteSpace: "nowrap",
-        cursor: "pointer",
-    },
-    tr: {
-        borderBottom: "1px solid #eee",
-    },
-    td: {
-        padding: "12px 16px",
-        fontSize: "14px",
-        textAlign: "left",
-    },
-    promoteButton: {
-        padding: "6px 12px",
-        backgroundColor: "#007BFF",
-        color: "white",
-        border: "none",
-        borderRadius: "6px",
-        cursor: "pointer",
-        fontSize: "13px",
-    },
-    addQuestionButton: {
-        padding: "10px 20px",
-        backgroundColor: "white",
-        border: "2px solid #333",
-        borderRadius: "20px",
-        fontWeight: "bold" as const,
-        fontSize: "15px",
-        cursor: "pointer",
-    },
-};
+const styles = webStyles;
 
 export default QuestionTable;
