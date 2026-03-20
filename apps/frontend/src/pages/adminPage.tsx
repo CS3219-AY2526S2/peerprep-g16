@@ -51,6 +51,8 @@ function AdminPage() {
     const [editSampleOutput, setEditSampleOutput] = useState("");
     const [editHiddenInput, setEditHiddenInput] = useState("");
     const [editHiddenOutput, setEditHiddenOutput] = useState("");
+    const [showTopicDropdown, setShowTopicDropdown] = useState(false);
+    const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
 
     useEffect(() => {
         fetchUsers();
@@ -63,6 +65,17 @@ function AdminPage() {
         setQuestionSuccess("");
         setQuestionError("");
     }, [activeTab]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.topic-dropdown')) {
+                setShowTopicDropdown(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const handleSort = (field: string) => {
         if (sortField === field) {
@@ -148,8 +161,12 @@ function AdminPage() {
     };
 
     const filteredQuestions = questions
-        .filter(q => filterTopic === "all" || (Array.isArray(q.topic) ? q.topic.includes(filterTopic) : q.topic === filterTopic))
-        .filter(q => filterDifficulty === "all" || q.difficulty === filterDifficulty)
+        .filter(q =>
+            selectedTopics.length === 0 ||
+            (Array.isArray(q.topic)
+                ? q.topic.some((t: string) => selectedTopics.includes(t))
+                : selectedTopics.includes(q.topic))
+        ).filter(q => filterDifficulty === "all" || q.difficulty === filterDifficulty)
         .filter(q =>
             q.questionId.toLowerCase().includes(questionSearchQuery.toLowerCase()) ||
             q.title.toLowerCase().includes(questionSearchQuery.toLowerCase())
@@ -339,16 +356,61 @@ function AdminPage() {
                                     style={styles.searchInput}
                                 />
                             </div>
-                            <select
-                                value={filterTopic}
-                                onChange={(e) => setFilterTopic(e.target.value)}
-                                style={styles.filterSelect}
-                            >
-                                <option value="all">All Topics</option>
-                                {[...new Set(questions.flatMap(q => Array.isArray(q.topic) ? q.topic : [q.topic]))].map(topic => (
-                                    <option key={topic} value={topic}>{topic}</option>
-                                ))}
-                            </select>
+                            <div style={{ position: "relative" }} className="topic-dropdown">
+                                <button
+                                    onClick={() => setShowTopicDropdown(!showTopicDropdown)}
+                                    style={styles.filterSelect}>
+                                    {selectedTopics.length === 0 ? "All Topics" : `${selectedTopics.length} Selected`} ▼
+                                </button>
+                                {showTopicDropdown && (
+                                    <div style={{
+                                        position: "absolute",
+                                        top: "100%",
+                                        left: 0,
+                                        backgroundColor: "white",
+                                        border: "1px solid #ccc",
+                                        borderRadius: "8px",
+                                        zIndex: 100,
+                                        minWidth: "150px",
+                                        boxShadow: "0px 4px 8px rgba(0,0,0,0.1)",
+                                        padding: "8px 0",
+                                    }}>
+                                        <div
+                                            onClick={() => setSelectedTopics([])}
+                                            style={{
+                                                padding: "8px 16px",
+                                                cursor: "pointer",
+                                                display: "flex",
+                                                justifyContent: "space-between",
+                                                backgroundColor: selectedTopics.length === 0 ? "#f0f0f0" : "white",
+                                            }}>
+                                            All Topics {selectedTopics.length === 0 && "✓"}
+                                        </div>
+                                        {[...new Set(questions.flatMap(q => Array.isArray(q.topic) ? q.topic : [q.topic]))].map(topic => (
+                                            <div
+                                                key={topic}
+                                                onClick={() => {
+                                                    setSelectedTopics(prev =>
+                                                        prev.includes(topic)
+                                                            ? prev.filter(t => t !== topic)
+                                                            : [...prev, topic]
+                                                    );
+                                                }}
+                                                style={{
+                                                    padding: "8px 16px",    
+                                                    cursor: "pointer",
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    alignItems: "center",     
+                                                    backgroundColor: selectedTopics.includes(topic) ? "#f0f0f0" : "white",
+                                                    whiteSpace: "nowrap",
+                                                }}>
+                                                {topic} {selectedTopics.includes(topic) && "✓"}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                             <select
                                 value={filterDifficulty}
                                 onChange={(e) => setFilterDifficulty(e.target.value)}
@@ -422,371 +484,375 @@ function AdminPage() {
                 )
                 }
             </div >
-            {showAddQuestion && (
-                <div style={styles.modalOverlay}>
-                    <div style={styles.modalBox}>
-                        <h3 style={{ marginBottom: "20px" }}>Add New Question</h3>
+            {
+                showAddQuestion && (
+                    <div style={styles.modalOverlay}>
+                        <div style={styles.modalBox}>
+                            <h3 style={{ marginBottom: "20px" }}>Add New Question</h3>
 
-                        <label style={styles.modalLabel}>
-                            Question ID:
-                            <input type="text" value={newQuestion.questionId}
-                                onChange={(e) => setNewQuestion({ ...newQuestion, questionId: e.target.value })}
-                                style={styles.modalInput} />
-                        </label>
+                            <label style={styles.modalLabel}>
+                                Question ID:
+                                <input type="text" value={newQuestion.questionId}
+                                    onChange={(e) => setNewQuestion({ ...newQuestion, questionId: e.target.value })}
+                                    style={styles.modalInput} />
+                            </label>
 
-                        <label style={styles.modalLabel}>
-                            Title:
-                            <input type="text" value={newQuestion.title}
-                                onChange={(e) => setNewQuestion({ ...newQuestion, title: e.target.value })}
-                                style={styles.modalInput} />
-                        </label>
+                            <label style={styles.modalLabel}>
+                                Title:
+                                <input type="text" value={newQuestion.title}
+                                    onChange={(e) => setNewQuestion({ ...newQuestion, title: e.target.value })}
+                                    style={styles.modalInput} />
+                            </label>
 
-                        <label style={styles.modalLabel}>
-                            Topics:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={topicInput}
-                                    onChange={(e) => setTopicInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Add a topic" />
-                                <button onClick={() => {
-                                    if (topicInput) {
-                                        setNewQuestion({ ...newQuestion, topic: [...newQuestion.topic, topicInput] });
-                                        setTopicInput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {newQuestion.topic.map((t, i) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>{t}</span>
-                                    <button onClick={() => setNewQuestion({ ...newQuestion, topic: newQuestion.topic.filter((_, idx) => idx !== i) })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                            <label style={styles.modalLabel}>
+                                Topics:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={topicInput}
+                                        onChange={(e) => setTopicInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Add a topic" />
+                                    <button onClick={() => {
+                                        if (topicInput) {
+                                            setNewQuestion({ ...newQuestion, topic: [...newQuestion.topic, topicInput] });
+                                            setTopicInput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
                                 </div>
-                            ))}
-                        </label>
-                        <label style={styles.modalLabel}>
-                            Difficulty:
-                            <select value={newQuestion.difficulty}
-                                onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
-                                style={styles.modalInput}>
-                                <option value="">Select...</option>
-                                <option value="Easy">Easy</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Hard">Hard</option>
-                            </select>
-                        </label>
+                                {newQuestion.topic.map((t, i) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>{t}</span>
+                                        <button onClick={() => setNewQuestion({ ...newQuestion, topic: newQuestion.topic.filter((_, idx) => idx !== i) })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
+                            <label style={styles.modalLabel}>
+                                Difficulty:
+                                <select value={newQuestion.difficulty}
+                                    onChange={(e) => setNewQuestion({ ...newQuestion, difficulty: e.target.value })}
+                                    style={styles.modalInput}>
+                                    <option value="">Select...</option>
+                                    <option value="Easy">Easy</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="Hard">Hard</option>
+                                </select>
+                            </label>
 
-                        <label style={styles.modalLabel}>
-                            Description:
-                            <textarea value={newQuestion.description}
-                                onChange={(e) => setNewQuestion({ ...newQuestion, description: e.target.value })}
-                                style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }} />
-                        </label>
+                            <label style={styles.modalLabel}>
+                                Description:
+                                <textarea value={newQuestion.description}
+                                    onChange={(e) => setNewQuestion({ ...newQuestion, description: e.target.value })}
+                                    style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }} />
+                            </label>
 
-                        {/* Constraints */}
-                        <label style={styles.modalLabel}>
-                            Constraints:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={constraintInput}
-                                    onChange={(e) => setConstraintInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Add a constraint" />
-                                <button onClick={() => {
-                                    if (constraintInput) {
-                                        setNewQuestion({ ...newQuestion, constraints: [...newQuestion.constraints, constraintInput] });
-                                        setConstraintInput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {newQuestion.constraints.map((c, i) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>{c}</span>
-                                    <button onClick={() => setNewQuestion({ ...newQuestion, constraints: newQuestion.constraints.filter((_, idx) => idx !== i) })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                            {/* Constraints */}
+                            <label style={styles.modalLabel}>
+                                Constraints:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={constraintInput}
+                                        onChange={(e) => setConstraintInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Add a constraint" />
+                                    <button onClick={() => {
+                                        if (constraintInput) {
+                                            setNewQuestion({ ...newQuestion, constraints: [...newQuestion.constraints, constraintInput] });
+                                            setConstraintInput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
                                 </div>
-                            ))}
-                        </label>
+                                {newQuestion.constraints.map((c, i) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>{c}</span>
+                                        <button onClick={() => setNewQuestion({ ...newQuestion, constraints: newQuestion.constraints.filter((_, idx) => idx !== i) })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
 
-                        {/* Hints */}
-                        <label style={styles.modalLabel}>
-                            Hints:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={hintInput}
-                                    onChange={(e) => setHintInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Add a hint" />
-                                <button onClick={() => {
-                                    if (hintInput) {
-                                        setNewQuestion({ ...newQuestion, hints: [...newQuestion.hints, hintInput] });
-                                        setHintInput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {newQuestion.hints.map((h, i) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>{h}</span>
-                                    <button onClick={() => setNewQuestion({ ...newQuestion, hints: newQuestion.hints.filter((_, idx) => idx !== i) })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                            {/* Hints */}
+                            <label style={styles.modalLabel}>
+                                Hints:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={hintInput}
+                                        onChange={(e) => setHintInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Add a hint" />
+                                    <button onClick={() => {
+                                        if (hintInput) {
+                                            setNewQuestion({ ...newQuestion, hints: [...newQuestion.hints, hintInput] });
+                                            setHintInput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
                                 </div>
-                            ))}
-                        </label>
+                                {newQuestion.hints.map((h, i) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>{h}</span>
+                                        <button onClick={() => setNewQuestion({ ...newQuestion, hints: newQuestion.hints.filter((_, idx) => idx !== i) })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
 
-                        {/* Sample Test Cases */}
-                        <label style={styles.modalLabel}>
-                            Sample Test Cases:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={sampleInput}
-                                    onChange={(e) => setSampleInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Input" />
-                                <input type="text" value={sampleOutput}
-                                    onChange={(e) => setSampleOutput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Expected Output" />
-                                <button onClick={() => {
-                                    if (sampleInput && sampleOutput) {
-                                        setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, sample: [...newQuestion.testCases.sample, { input: sampleInput, expectedOutput: sampleOutput }] } });
-                                        setSampleInput("");
-                                        setSampleOutput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {newQuestion.testCases.sample.map((s, i) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>Input: {s.input} | Output: {s.expectedOutput}</span>
-                                    <button onClick={() => setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, sample: newQuestion.testCases.sample.filter((_, idx) => idx !== i) } })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                            {/* Sample Test Cases */}
+                            <label style={styles.modalLabel}>
+                                Sample Test Cases:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={sampleInput}
+                                        onChange={(e) => setSampleInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Input" />
+                                    <input type="text" value={sampleOutput}
+                                        onChange={(e) => setSampleOutput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Expected Output" />
+                                    <button onClick={() => {
+                                        if (sampleInput && sampleOutput) {
+                                            setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, sample: [...newQuestion.testCases.sample, { input: sampleInput, expectedOutput: sampleOutput }] } });
+                                            setSampleInput("");
+                                            setSampleOutput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
                                 </div>
-                            ))}
-                        </label>
+                                {newQuestion.testCases.sample.map((s, i) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>Input: {s.input} | Output: {s.expectedOutput}</span>
+                                        <button onClick={() => setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, sample: newQuestion.testCases.sample.filter((_, idx) => idx !== i) } })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
 
-                        {/* Hidden Test Cases */}
-                        <label style={styles.modalLabel}>
-                            Hidden Test Cases:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={hiddenInput}
-                                    onChange={(e) => setHiddenInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Input" />
-                                <input type="text" value={hiddenOutput}
-                                    onChange={(e) => setHiddenOutput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Expected Output" />
-                                <button onClick={() => {
-                                    if (hiddenInput && hiddenOutput) {
-                                        setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, hidden: [...newQuestion.testCases.hidden, { input: hiddenInput, expectedOutput: hiddenOutput }] } });
-                                        setHiddenInput("");
-                                        setHiddenOutput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {newQuestion.testCases.hidden.map((h, i) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>Input: {h.input} | Output: {h.expectedOutput}</span>
-                                    <button onClick={() => setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, hidden: newQuestion.testCases.hidden.filter((_, idx) => idx !== i) } })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                            {/* Hidden Test Cases */}
+                            <label style={styles.modalLabel}>
+                                Hidden Test Cases:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={hiddenInput}
+                                        onChange={(e) => setHiddenInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Input" />
+                                    <input type="text" value={hiddenOutput}
+                                        onChange={(e) => setHiddenOutput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Expected Output" />
+                                    <button onClick={() => {
+                                        if (hiddenInput && hiddenOutput) {
+                                            setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, hidden: [...newQuestion.testCases.hidden, { input: hiddenInput, expectedOutput: hiddenOutput }] } });
+                                            setHiddenInput("");
+                                            setHiddenOutput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
                                 </div>
-                            ))}
-                        </label>
+                                {newQuestion.testCases.hidden.map((h, i) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>Input: {h.input} | Output: {h.expectedOutput}</span>
+                                        <button onClick={() => setNewQuestion({ ...newQuestion, testCases: { ...newQuestion.testCases, hidden: newQuestion.testCases.hidden.filter((_, idx) => idx !== i) } })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
 
-                        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-                            {questionError && <p style={{ color: "red", marginBottom: "10px" }}>{questionError}</p>}
-                            <button onClick={handleAddQuestion} style={styles.promoteButton}>Submit</button>
-                            <button onClick={() => {
-                                setShowAddQuestion(false);
-                                setNewQuestion({ questionId: "", title: "", topic: [], difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [] } });
-                            }} style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
-                                Cancel
-                            </button>
+                            <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                                {questionError && <p style={{ color: "red", marginBottom: "10px" }}>{questionError}</p>}
+                                <button onClick={handleAddQuestion} style={styles.promoteButton}>Submit</button>
+                                <button onClick={() => {
+                                    setShowAddQuestion(false);
+                                    setNewQuestion({ questionId: "", title: "", topic: [], difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [] } });
+                                }} style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-            {showEditQuestion && editQuestion && (
-                <div style={styles.modalOverlay}>
-                    <div style={styles.modalBox}>
-                        <h3 style={{ marginBottom: "20px" }}>Edit Question</h3>
+                )
+            }
+            {
+                showEditQuestion && editQuestion && (
+                    <div style={styles.modalOverlay}>
+                        <div style={styles.modalBox}>
+                            <h3 style={{ marginBottom: "20px" }}>Edit Question</h3>
 
-                        <label style={styles.modalLabel}>
-                            Question ID:
-                            <input type="text" value={editQuestion.questionId}
-                                disabled
-                                style={{ ...styles.modalInput, backgroundColor: "#f5f5f5", cursor: "not-allowed" }} />
-                        </label>
+                            <label style={styles.modalLabel}>
+                                Question ID:
+                                <input type="text" value={editQuestion.questionId}
+                                    disabled
+                                    style={{ ...styles.modalInput, backgroundColor: "#f5f5f5", cursor: "not-allowed" }} />
+                            </label>
 
-                        <label style={styles.modalLabel}>
-                            Title:
-                            <input type="text" value={editQuestion.title}
-                                onChange={(e) => setEditQuestion({ ...editQuestion, title: e.target.value })}
-                                style={styles.modalInput} />
-                        </label>
+                            <label style={styles.modalLabel}>
+                                Title:
+                                <input type="text" value={editQuestion.title}
+                                    onChange={(e) => setEditQuestion({ ...editQuestion, title: e.target.value })}
+                                    style={styles.modalInput} />
+                            </label>
 
-                        <label style={styles.modalLabel}>
-                            Topics:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={editTopicInput}
-                                    onChange={(e) => setEditTopicInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Add a topic" />
-                                <button onClick={() => {
-                                    if (editTopicInput) {
-                                        setEditQuestion({
+                            <label style={styles.modalLabel}>
+                                Topics:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={editTopicInput}
+                                        onChange={(e) => setEditTopicInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Add a topic" />
+                                    <button onClick={() => {
+                                        if (editTopicInput) {
+                                            setEditQuestion({
+                                                ...editQuestion,
+                                                topic: [...(Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]), editTopicInput]
+                                            });
+                                            setEditTopicInput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
+                                </div>
+                                {(Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]).map((t: string, i: number) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>{t}</span>
+                                        <button onClick={() => setEditQuestion({
                                             ...editQuestion,
-                                            topic: [...(Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]), editTopicInput]
-                                        });
-                                        setEditTopicInput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {(Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]).map((t: string, i: number) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>{t}</span>
-                                    <button onClick={() => setEditQuestion({
-                                        ...editQuestion,
-                                        topic: (Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]).filter((_: any, idx: number) => idx !== i)
-                                    })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                            topic: (Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]).filter((_: any, idx: number) => idx !== i)
+                                        })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
+
+                            <label style={styles.modalLabel}>
+                                Difficulty:
+                                <select value={editQuestion.difficulty}
+                                    onChange={(e) => setEditQuestion({ ...editQuestion, difficulty: e.target.value })}
+                                    style={styles.modalInput}>
+                                    <option value="Easy">Easy</option>
+                                    <option value="Medium">Medium</option>
+                                    <option value="Hard">Hard</option>
+                                </select>
+                            </label>
+
+                            <label style={styles.modalLabel}>
+                                Description:
+                                <textarea value={editQuestion.description}
+                                    onChange={(e) => setEditQuestion({ ...editQuestion, description: e.target.value })}
+                                    style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }} />
+                            </label>
+
+                            {/* Constraints */}
+                            <label style={styles.modalLabel}>
+                                Constraints:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={editConstraintInput}
+                                        onChange={(e) => setEditConstraintInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Add a constraint" />
+                                    <button onClick={() => {
+                                        if (editConstraintInput) {
+                                            setEditQuestion({ ...editQuestion, constraints: [...(editQuestion.constraints || []), editConstraintInput] });
+                                            setEditConstraintInput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
                                 </div>
-                            ))}
-                        </label>
+                                {(editQuestion.constraints || []).map((c: string, i: number) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>{c}</span>
+                                        <button onClick={() => setEditQuestion({ ...editQuestion, constraints: editQuestion.constraints.filter((_: any, idx: number) => idx !== i) })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
 
-                        <label style={styles.modalLabel}>
-                            Difficulty:
-                            <select value={editQuestion.difficulty}
-                                onChange={(e) => setEditQuestion({ ...editQuestion, difficulty: e.target.value })}
-                                style={styles.modalInput}>
-                                <option value="Easy">Easy</option>
-                                <option value="Medium">Medium</option>
-                                <option value="Hard">Hard</option>
-                            </select>
-                        </label>
+                            {/* Hints */}
+                            <label style={styles.modalLabel}>
+                                Hints:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={editHintInput}
+                                        onChange={(e) => setEditHintInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Add a hint" />
+                                    <button onClick={() => {
+                                        if (editHintInput) {
+                                            setEditQuestion({ ...editQuestion, hints: [...(editQuestion.hints || []), editHintInput] });
+                                            setEditHintInput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
+                                </div>
+                                {(editQuestion.hints || []).map((h: string, i: number) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>{h}</span>
+                                        <button onClick={() => setEditQuestion({ ...editQuestion, hints: editQuestion.hints.filter((_: any, idx: number) => idx !== i) })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
 
-                        <label style={styles.modalLabel}>
-                            Description:
-                            <textarea value={editQuestion.description}
-                                onChange={(e) => setEditQuestion({ ...editQuestion, description: e.target.value })}
-                                style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }} />
-                        </label>
+                            {/* Sample Test Cases */}
+                            <label style={styles.modalLabel}>
+                                Sample Test Cases:
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={editSampleInput}
+                                        onChange={(e) => setEditSampleInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Input" />
+                                    <input type="text" value={editSampleOutput}
+                                        onChange={(e) => setEditSampleOutput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Expected Output" />
+                                    <button onClick={() => {
+                                        if (editSampleInput && editSampleOutput) {
+                                            setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, sample: [...(editQuestion.testCases.sample || []), { input: editSampleInput, expectedOutput: editSampleOutput }] } });
+                                            setEditSampleInput("");
+                                            setEditSampleOutput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
+                                </div>
+                                {(editQuestion.testCases.sample || []).map((s: any, i: number) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>Input: {s.input} | Output: {s.expectedOutput}</span>
+                                        <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, sample: editQuestion.testCases.sample.filter((_: any, idx: number) => idx !== i) } })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
 
-                        {/* Constraints */}
-                        <label style={styles.modalLabel}>
-                            Constraints:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={editConstraintInput}
-                                    onChange={(e) => setEditConstraintInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Add a constraint" />
+                            {/* Hidden Test Cases */}
+                            <label style={styles.modalLabel}>
+                                Hidden Test Cases: <span style={{ color: "red" }}>*</span>
+                                <div style={{ display: "flex", gap: "8px" }}>
+                                    <input type="text" value={editHiddenInput}
+                                        onChange={(e) => setEditHiddenInput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Input" />
+                                    <input type="text" value={editHiddenOutput}
+                                        onChange={(e) => setEditHiddenOutput(e.target.value)}
+                                        style={{ ...styles.modalInput, flex: 1 }}
+                                        placeholder="Expected Output" />
+                                    <button onClick={() => {
+                                        if (editHiddenInput && editHiddenOutput) {
+                                            setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, hidden: [...(editQuestion.testCases.hidden || []), { input: editHiddenInput, expectedOutput: editHiddenOutput }] } });
+                                            setEditHiddenInput("");
+                                            setEditHiddenOutput("");
+                                        }
+                                    }} style={styles.promoteButton}>Add</button>
+                                </div>
+                                {(editQuestion.testCases.hidden || []).map((h: any, i: number) => (
+                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
+                                        <span>Input: {h.input} | Output: {h.expectedOutput}</span>
+                                        <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, hidden: editQuestion.testCases.hidden.filter((_: any, idx: number) => idx !== i) } })}
+                                            style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
+                                    </div>
+                                ))}
+                            </label>
+
+                            {questionError && <p style={{ color: "red", marginBottom: "10px" }}>{questionError}</p>}
+                            <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                                <button onClick={handleEditQuestion} style={styles.promoteButton}>Save</button>
                                 <button onClick={() => {
-                                    if (editConstraintInput) {
-                                        setEditQuestion({ ...editQuestion, constraints: [...(editQuestion.constraints || []), editConstraintInput] });
-                                        setEditConstraintInput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
+                                    setShowEditQuestion(false);
+                                    setEditQuestion(null);
+                                    setQuestionError("");
+                                }} style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
+                                    Cancel
+                                </button>
                             </div>
-                            {(editQuestion.constraints || []).map((c: string, i: number) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>{c}</span>
-                                    <button onClick={() => setEditQuestion({ ...editQuestion, constraints: editQuestion.constraints.filter((_: any, idx: number) => idx !== i) })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
-                                </div>
-                            ))}
-                        </label>
-
-                        {/* Hints */}
-                        <label style={styles.modalLabel}>
-                            Hints:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={editHintInput}
-                                    onChange={(e) => setEditHintInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Add a hint" />
-                                <button onClick={() => {
-                                    if (editHintInput) {
-                                        setEditQuestion({ ...editQuestion, hints: [...(editQuestion.hints || []), editHintInput] });
-                                        setEditHintInput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {(editQuestion.hints || []).map((h: string, i: number) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>{h}</span>
-                                    <button onClick={() => setEditQuestion({ ...editQuestion, hints: editQuestion.hints.filter((_: any, idx: number) => idx !== i) })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
-                                </div>
-                            ))}
-                        </label>
-
-                        {/* Sample Test Cases */}
-                        <label style={styles.modalLabel}>
-                            Sample Test Cases:
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={editSampleInput}
-                                    onChange={(e) => setEditSampleInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Input" />
-                                <input type="text" value={editSampleOutput}
-                                    onChange={(e) => setEditSampleOutput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Expected Output" />
-                                <button onClick={() => {
-                                    if (editSampleInput && editSampleOutput) {
-                                        setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, sample: [...(editQuestion.testCases.sample || []), { input: editSampleInput, expectedOutput: editSampleOutput }] } });
-                                        setEditSampleInput("");
-                                        setEditSampleOutput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {(editQuestion.testCases.sample || []).map((s: any, i: number) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>Input: {s.input} | Output: {s.expectedOutput}</span>
-                                    <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, sample: editQuestion.testCases.sample.filter((_: any, idx: number) => idx !== i) } })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
-                                </div>
-                            ))}
-                        </label>
-
-                        {/* Hidden Test Cases */}
-                        <label style={styles.modalLabel}>
-                            Hidden Test Cases: <span style={{ color: "red" }}>*</span>
-                            <div style={{ display: "flex", gap: "8px" }}>
-                                <input type="text" value={editHiddenInput}
-                                    onChange={(e) => setEditHiddenInput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Input" />
-                                <input type="text" value={editHiddenOutput}
-                                    onChange={(e) => setEditHiddenOutput(e.target.value)}
-                                    style={{ ...styles.modalInput, flex: 1 }}
-                                    placeholder="Expected Output" />
-                                <button onClick={() => {
-                                    if (editHiddenInput && editHiddenOutput) {
-                                        setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, hidden: [...(editQuestion.testCases.hidden || []), { input: editHiddenInput, expectedOutput: editHiddenOutput }] } });
-                                        setEditHiddenInput("");
-                                        setEditHiddenOutput("");
-                                    }
-                                }} style={styles.promoteButton}>Add</button>
-                            </div>
-                            {(editQuestion.testCases.hidden || []).map((h: any, i: number) => (
-                                <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
-                                    <span>Input: {h.input} | Output: {h.expectedOutput}</span>
-                                    <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, hidden: editQuestion.testCases.hidden.filter((_: any, idx: number) => idx !== i) } })}
-                                        style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
-                                </div>
-                            ))}
-                        </label>
-
-                        {questionError && <p style={{ color: "red", marginBottom: "10px" }}>{questionError}</p>}
-                        <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
-                            <button onClick={handleEditQuestion} style={styles.promoteButton}>Save</button>
-                            <button onClick={() => {
-                                setShowEditQuestion(false);
-                                setEditQuestion(null);
-                                setQuestionError("");
-                            }} style={{ ...styles.promoteButton, backgroundColor: "gray" }}>
-                                Cancel
-                            </button>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
         </div >
     );
 }
