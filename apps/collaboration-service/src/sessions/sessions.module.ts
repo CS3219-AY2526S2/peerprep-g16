@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { SessionsController } from './sessions.controller';
 import { SessionsService } from './sessions.service';
 
 @Module({
+    imports: [ConfigModule],
     controllers: [SessionsController],
     providers: [SessionsService],
-    exports: [SessionsService], // so WhiteboardGateway can use it later
+    exports: [SessionsService],
 })
-export class SessionsModule { }
+export class SessionsModule {}
