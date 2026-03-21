@@ -16,7 +16,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
     @WebSocketServer()
     server: Server;
 
-    constructor(private readonly sessionsService: SessionsService) {}
+    constructor(private readonly sessionsService: SessionsService) { }
 
     // called once WebSocket server is ready — pass server ref to SessionsService
     afterInit(server: Server) {
@@ -44,6 +44,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         client.join(data.sessionId);
         console.log(`User ${data.userId} joined session ${data.sessionId}`);
         client.emit('whiteboardState', { elements: session.whiteboardElements });
+        client.emit('codeState', { code: session.code, language: session.language });
     }
 
     @SubscribeMessage('whiteboardUpdate')
@@ -57,4 +58,33 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
             userId: data.userId,
         });
     }
+
+    @SubscribeMessage('codeUpdate')
+    handleCodeUpdate(
+        @MessageBody() data: { sessionId: string; userId: string; code: string; language?: string },
+        @ConnectedSocket() client: Socket,
+    ) {
+        this.sessionsService.updateCode(data.sessionId, data.code, data.language);
+        client.to(data.sessionId).emit('codeUpdate', {
+            code: data.code,
+            language: data.language,
+            userId: data.userId,
+        });
+    }
+
+    // ── Frontend emits this on join to get current code state ─────────────
+    // socket.emit("codeState", { sessionId })
+    @SubscribeMessage('codeState')
+    handleCodeState(
+        @MessageBody() data: { sessionId: string },
+        @ConnectedSocket() client: Socket,
+    ) {
+        const session = this.sessionsService.findOne(data.sessionId);
+        if (!session) {
+            client.emit('error', { message: 'Session not found' });
+            return;
+        }
+        client.emit('codeState', { code: session.code, language: session.language });
+    }
 }
+
