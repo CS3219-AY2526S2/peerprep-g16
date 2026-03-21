@@ -11,8 +11,8 @@ export async function connectToDB() {
   await connect(mongoDBUri);
 }
 
-export async function createUser(username, email, password) {
-  return new UserModel({ username, email, password }).save();
+export async function createUser(username, email, password, isAdmin = false) {
+  return new UserModel({ username, email, password, isAdmin }).save();
 }
 
 export async function findUserByEmail(email) {
@@ -24,13 +24,13 @@ export async function findUserById(userId) {
 }
 
 export async function findUserByUsername(username) {
-  return UserModel.findOne({ username });
+  return UserModel.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
 }
 
 export async function findUserByUsernameOrEmail(username, email) {
   return UserModel.findOne({
     $or: [
-      { username },
+      { username: { $regex: new RegExp(`^${username}$`, 'i') } },
       { email },
     ],
   });
@@ -68,4 +68,12 @@ export async function updateUserPrivilegeById(userId, isAdmin) {
 
 export async function deleteUserById(userId) {
   return UserModel.findByIdAndDelete(userId);
+}
+
+export async function updateRefreshToken(userId, refreshToken) {
+  return UserModel.findByIdAndUpdate(
+    userId,
+    { $set: { refreshToken } },
+    { new: true }
+  );
 }
