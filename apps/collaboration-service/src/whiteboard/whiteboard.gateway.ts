@@ -10,17 +10,46 @@ import {
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { SessionsService } from '../sessions/sessions.service';
+import { ConfigService } from '@nestjs/config';
+import * as jwt from 'jsonwebtoken';
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer()
     server: Server;
 
-    constructor(private readonly sessionsService: SessionsService) { }
+    constructor(
+        private readonly sessionsService: SessionsService,
+        private readonly configService: ConfigService,
+    ) {}
 
-    // called once WebSocket server is ready — pass server ref to SessionsService
     afterInit(server: Server) {
         this.sessionsService.setServer(server);
+
+        // verify JWT before allowing WebSocket connection
+        server.use((socket, next) => {
+            const token = socket.handshake.auth?.token;
+            if (!token) {
+                return next(new Error('No token provided'));
+            }
+
+            const secret = this.configService.get<string>('JWT_SECRET');
+            if (!secret) return next(new Error('JWT_SECRET not configured'));
+
+            try {
+                const payload = jwt.verify(token, secret) as { id: string; isAdmin: boolean };
+
+                if (payload.isAdmin) {
+                    return next(new Error('Admins cannot access collaboration sessions'));
+                }
+
+                // attach user to socket for use in handlers
+                (socket as any).user = payload;
+                next();
+            } catch (err) {
+                return next(new Error('Invalid or expired token'));
+            }
+        });
     }
 
     handleConnection(client: Socket) {
@@ -41,8 +70,16 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
             client.emit('error', { message: 'Session not found' });
             return;
         }
+
+        // check user belongs to this session
+        const user = (client as any).user;
+        if (session.userId !== user.id && session.peerId !== user.id) {
+            client.emit('error', { message: 'You are not part of this session' });
+            return;
+        }
+
         client.join(data.sessionId);
-        console.log(`User ${data.userId} joined session ${data.sessionId}`);
+        console.log(`User ${user.id} joined session ${data.sessionId}`);
         client.emit('whiteboardState', { elements: session.whiteboardElements });
         client.emit('codeState', { code: session.code, language: session.language });
     }
@@ -72,8 +109,6 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         });
     }
 
-    // ── Frontend emits this on join to get current code state ─────────────
-    // socket.emit("codeState", { sessionId })
     @SubscribeMessage('codeState')
     handleCodeState(
         @MessageBody() data: { sessionId: string },
@@ -87,4 +122,3 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         client.emit('codeState', { code: session.code, language: session.language });
     }
 }
-

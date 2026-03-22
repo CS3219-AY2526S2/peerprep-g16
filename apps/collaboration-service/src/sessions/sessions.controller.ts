@@ -1,16 +1,16 @@
-import { Controller, Post, Get, Body, Param, NotFoundException, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, NotFoundException, UseGuards, ForbiddenException, Req } from '@nestjs/common';
+import { Request } from 'express';
 import { SessionsService } from './sessions.service';
 import { UserGuard } from '../auth/user.guard';
+
+type AuthenticatedRequest = Request & {
+    user?: { id: string; isAdmin: boolean };
+};
 
 @Controller('sessions')
 export class SessionsController {
     constructor(private readonly sessionsService: SessionsService) {}
 
-    /**
-     * Called by Matching Service when a match is found.
-     * Creates a session and returns sessionId + full session data.
-     * Matching Service should forward the sessionId to both users.
-     */
     @Post('create')
     async create(@Body() body: {
         userId: string;
@@ -23,28 +23,34 @@ export class SessionsController {
         return this.sessionsService.create(body);
     }
 
-    /**
-     * Called by Frontend on collaboration page load.
-     * Returns full session data including question, code, and whiteboard state.
-     */
     @UseGuards(UserGuard)
     @Get(':id')
-    findOne(@Param('id') id: string) {
+    findOne(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
         const session = this.sessionsService.findOne(id);
         if (!session) throw new NotFoundException('Session not found');
+
+        // ensure requesting user belongs to this session
+        const userId = req.user?.id;
+        if (session.userId !== userId && session.peerId !== userId) {
+            throw new ForbiddenException('You are not part of this session');
+        }
+
         return session;
     }
 
-    /**
-     * Called by Frontend when user clicks "End Session".
-     * Ends the session and clears it from memory.
-     * Frontend should redirect to /homepage on success.
-     */
     @UseGuards(UserGuard)
     @Post(':id/end')
-    async endSession(@Param('id') id: string) {
-        const session = await this.sessionsService.endSession(id);
+    async endSession(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+        const session = this.sessionsService.findOne(id);
         if (!session) throw new NotFoundException('Session not found');
+
+        // ensure requesting user belongs to this session
+        const userId = req.user?.id;
+        if (session.userId !== userId && session.peerId !== userId) {
+            throw new ForbiddenException('You are not part of this session');
+        }
+
+        await this.sessionsService.endSession(id);
         return { message: 'Session ended', redirectUrl: '/homepage' };
     }
 }
