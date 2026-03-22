@@ -167,7 +167,7 @@ function Appcontent() {
                     </ProtectedAdminRoute>
                 } />
                 <Route path="/history"></Route>
-                <Route path="/collaboration" element={
+                <Route path="/collaboration/:sessionId" element={
                     <ProtectedUserRoute>
                         <Collaboration
                             matchingId="match-001"
