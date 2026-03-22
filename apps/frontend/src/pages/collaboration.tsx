@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useParams, Navigate } from "react-router-dom";
 import Whiteboard from "../components/collaboration/Whiteboard";
 import CodeSpace from "../components/collaboration/CodeSpace";
 import HintPanel from "../components/collaboration/HintPanel";
@@ -15,8 +16,8 @@ type ActivePanel = "whiteboard" | "code";
 type Question = {
     questionId: string;
     title: string;
-    difficulty: "Easy" | "Medium" | "Hard";
     topic: string;
+    difficulty: "Easy" | "Medium" | "Hard";
     description: string;
     constraints: string[];
     hints: string[];
@@ -26,22 +27,22 @@ type Question = {
     };
 };
 
-type CollaborationProps = {
-    matchingId: string;
-    userId: string;
-    peerId: string;
-};
+function Collaboration() {
+    const { sessionId: matchingId } = useParams<{ sessionId: string }>();
+    const stored = localStorage.getItem("login");
+    const user = stored ? JSON.parse(stored) : null;
+    const userId = user?.id ?? "";
 
-function Collaboration({ matchingId, userId, peerId }: CollaborationProps) {
-    void peerId;
     const [activePanel, setActivePanel] = useState<ActivePanel>("whiteboard");
     const [codeExpanded, setCodeExpanded] = useState(false);
     const [question, setQuestion] = useState<Question | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [connectionState, setConnectionState] = useState<
-        "Connected" | "Connecting" | "Disconnected"
-    >("Connecting");
-    const socketRef = useRef<Socket | null>(null);
+    const [connectionState, setConnectionState] = useState <
+    "Connected" | "Connecting" | "Disconnected"
+        > ("Connecting");
+    const [socket, setSocket] = useState<Socket | null>(null);
+
+    if (!matchingId || !user) return <Navigate to="/" replace />;
 
     useEffect(() => {
         let mounted = true;
@@ -50,10 +51,8 @@ function Collaboration({ matchingId, userId, peerId }: CollaborationProps) {
             try {
                 setConnectionState("Connecting");
 
-                // 1) fetch session from collab service
                 const session = await fetchSession(matchingId);
 
-                // 2) if question already ready, set it
                 if (session.status === "active" && session.question) {
                     if (mounted) {
                         setQuestion(session.question);
@@ -61,28 +60,25 @@ function Collaboration({ matchingId, userId, peerId }: CollaborationProps) {
                     }
                 }
 
-                // 3) connect WebSocket
-                const socket = connectSocket();
-                socketRef.current = socket;
+                const connectedSocket = connectSocket();
+                setSocket(connectedSocket);
 
-                socket.on("connect", () => {
+                connectedSocket.on("connect", () => {
                     if (mounted) setConnectionState("Connected");
-                    // join the session room
-                    socket.emit("joinSession", { sessionId: matchingId, userId });
+                    connectedSocket.emit("joinSession", { sessionId: matchingId, userId });
                 });
 
-                socket.on("connect_error", (err) => {
+                connectedSocket.on("connect_error", (err) => {
                     console.error("WebSocket connection error:", err.message);
                     if (mounted) setConnectionState("Disconnected");
                 });
 
-                socket.on("disconnect", () => {
+                connectedSocket.on("disconnect", () => {
                     if (mounted) setConnectionState("Disconnected");
                 });
 
-                // 4) if session was 'waiting', listen for questionReady
                 if (session.status === "waiting") {
-                    socket.on("questionReady", ({ question: q }: { question: Question }) => {
+                    connectedSocket.on("questionReady", ({ question: q }: { question: Question }) => {
                         if (mounted) {
                             setQuestion(q);
                             setIsLoading(false);
@@ -93,9 +89,9 @@ function Collaboration({ matchingId, userId, peerId }: CollaborationProps) {
             } catch (err: any) {
                 console.error("Collaboration bootstrap failed", err);
                 if (
+                    err.message === "UNAUTHORIZED" ||
                     err.message === "FORBIDDEN" ||
-                    err.message === "NOT_FOUND" ||
-                    err.message === "Failed to fetch session"  // catches 401 too
+                    err.message === "NOT_FOUND"
                 ) {
                     window.location.href = "/homepage";
                     return;
@@ -177,13 +173,11 @@ function Collaboration({ matchingId, userId, peerId }: CollaborationProps) {
                                 </h2>
                                 <div style={styles.tagRow}>
                                     {question && (
-                                        <span
-                                            style={{
-                                                ...styles.difficultyTag,
-                                                color: difficultyColor,
-                                                background: `${difficultyColor}18`,
-                                            }}
-                                        >
+                                        <span style={{
+                                            ...styles.difficultyTag,
+                                            color: difficultyColor,
+                                            background: `${difficultyColor}18`,
+                                        }}>
                                             {question.difficulty}
                                         </span>
                                     )}
@@ -217,7 +211,7 @@ function Collaboration({ matchingId, userId, peerId }: CollaborationProps) {
                         </div>
                     </div>
 
-                    <HintPanel />
+                    <HintPanel hints={question?.hints ?? []} />
                 </div>
 
                 <div style={styles.rightColumn}>
@@ -225,7 +219,7 @@ function Collaboration({ matchingId, userId, peerId }: CollaborationProps) {
                         <Whiteboard
                             sessionId={matchingId}
                             userId={userId}
-                            socket={socketRef.current}
+                            socket={socket}
                         />
                     </div>
                     <div style={{ ...styles.codeSpace, flex: codeExpanded ? "1 1 50%" : "0 0 auto" }}>
@@ -234,7 +228,7 @@ function Collaboration({ matchingId, userId, peerId }: CollaborationProps) {
                             onToggle={codeExpanded ? hideCode : showCode}
                             sessionId={matchingId}
                             userId={userId}
-                            socket={socketRef.current}
+                            socket={socket}
                         />
                     </div>
                 </div>
