@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import api from "./axiosInstance";
 
 const COLLAB_URL = "http://localhost:3003";
 
@@ -29,25 +30,24 @@ export function getSocket(): Socket | null {
 }
 
 export async function fetchSession(sessionId: string) {
-    const token = getToken();
-    const res = await fetch(`${COLLAB_URL}/sessions/${sessionId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
-
-    if (res.status === 401) throw new Error("UNAUTHORIZED");
-    if (res.status === 403) throw new Error("FORBIDDEN");
-    if (res.status === 404) throw new Error("NOT_FOUND");
-    if (!res.ok) throw new Error("Failed to fetch session");
-
-    return res.json();
+    try {
+        const res = await api.get(`${COLLAB_URL}/sessions/${sessionId}`);
+        return res.data;
+    } catch (err: any) {
+        if (err.response?.status === 401) throw new Error("UNAUTHORIZED");
+        if (err.response?.status === 403) throw new Error("FORBIDDEN");
+        if (err.response?.status === 404) throw new Error("NOT_FOUND");
+        throw new Error("Failed to fetch session");
+    }
 }
 
 export async function endSession(sessionId: string) {
-    const token = getToken();
-    const res = await fetch(`${COLLAB_URL}/sessions/${sessionId}/end`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error("Failed to end session");
-    return res.json();
+    try {
+        const res = await api.post(`${COLLAB_URL}/sessions/${sessionId}/end`);
+        return res.data;
+    } catch (err: any) {
+        if (err.response?.status === 401) throw new Error("UNAUTHORIZED");
+        if (err.response?.status === 403) throw new Error("FORBIDDEN");
+        throw new Error("Failed to end session");
+    }
 }
