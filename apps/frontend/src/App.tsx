@@ -169,10 +169,7 @@ function Appcontent() {
                 <Route path="/history"></Route>
                 <Route path="/collaboration/:sessionId" element={
                     <ProtectedUserRoute>
-                        <Collaboration
-                            matchingId="match-001"
-                            userId="69bbf497546bef968dcda468"
-                            peerId='69bbf497546bef968dcda468' />
+                        <Collaboration/>
                     </ProtectedUserRoute>
                 }
                 />
