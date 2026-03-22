@@ -33,7 +33,12 @@ export async function fetchSession(sessionId: string) {
     const res = await fetch(`${COLLAB_URL}/sessions/${sessionId}`, {
         headers: { Authorization: `Bearer ${token}` },
     });
+
+    if (res.status === 401) throw new Error("UNAUTHORIZED");
+    if (res.status === 403) throw new Error("FORBIDDEN");
+    if (res.status === 404) throw new Error("NOT_FOUND");
     if (!res.ok) throw new Error("Failed to fetch session");
+
     return res.json();
 }
 
