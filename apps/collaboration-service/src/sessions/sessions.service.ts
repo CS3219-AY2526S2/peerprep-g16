@@ -4,8 +4,8 @@ import { Server } from 'socket.io';
 
 export interface Session {
     sessionId: string;
-    userId: string;
-    peerId: string;
+    userAId: string;
+    userBId: string;
     matchId: string;
     topic: string;
     question: any;
@@ -42,7 +42,7 @@ export class SessionsService {
      * Called by Matching Service (service-to-service, no auth needed).
      *
      * POST /sessions/create
-     * Body: { userId, peerId, matchId, topic, userDifficulty, peerDifficulty }
+     * Body: { userAId, userBId, matchId, topic, userADifficulty, userBDifficulty }
      * Returns: session with status 'waiting'
      *
      * Frontend should:
@@ -52,17 +52,17 @@ export class SessionsService {
      * 4. Listen for 'questionReady' event to start the collab room
      */
     async create(data: {
-        userId: string;
-        peerId: string;
+        userAId: string;
+        userBId: string;
         matchId: string;
         topic: string;
-        userDifficulty: string;
-        peerDifficulty: string;
+        userADifficulty: string;
+        userBDifficulty: string;
     }): Promise<Session> {
         const session: Session = {
             sessionId: data.matchId,
-            userId: data.userId,
-            peerId: data.peerId,
+            userAId: data.userAId,
+            userBId: data.userBId,
             matchId: data.matchId,
             topic: data.topic,
             question: null,
@@ -91,17 +91,17 @@ export class SessionsService {
     private async fetchAndAttachQuestion(data: {
         matchId: string;
         topic: string;
-        userDifficulty: string;
-        peerDifficulty: string;
-        userId: string;
-        peerId: string;
+        userADifficulty: string;
+        userBDifficulty: string;
+        userAId: string;
+        userBId: string;
     }): Promise<void> {
         const question = await this.fetchQuestion(
             data.topic,
-            data.userDifficulty,
-            data.peerDifficulty,
-            data.userId,
-            data.peerId,
+            data.userADifficulty,
+            data.userBDifficulty,
+            data.userAId,
+            data.userBId,
         );
 
         const session = this.sessions.get(data.matchId);
@@ -175,7 +175,7 @@ export class SessionsService {
      * Fetches a question from Question Service.
      *
      * TODO: Question Service needs to implement:
-     * GET /questions/match?topic=&userDifficulty=&peerDifficulty=&userId=&peerId=
+     * GET /questions/match?topic=&userADifficulty=&userBDifficulty=&userAId=&userBId=
      *
      * Logic in Question Service:
      * - Filter questions not attempted by either user
@@ -185,10 +185,10 @@ export class SessionsService {
      */
     private async fetchQuestion(
         topic: string,
-        userDifficulty: string,
-        peerDifficulty: string,
-        userId: string,
-        peerId: string,
+        userADifficulty: string,
+        userBDifficulty: string,
+        userAId: string,
+        userBId: string,
     ): Promise<any> {
         const questionServiceUrl = this.configService.get<string>('QUESTION_SERVICE_URL');
 
@@ -198,7 +198,7 @@ export class SessionsService {
         }
 
         try {
-            const url = `${questionServiceUrl}/questions/match?topic=${topic}&userDifficulty=${userDifficulty}&peerDifficulty=${peerDifficulty}&userId=${userId}&peerId=${peerId}`;
+            const url = `${questionServiceUrl}/questions/match?topic=${topic}&userADifficulty=${userADifficulty}&userBDifficulty=${userBDifficulty}&userAId=${userAId}&userBId=${userBId}`;
             const response = await fetch(url);
             if (!response.ok) {
                 this.logger.warn('Question Service error — falling back to mock');

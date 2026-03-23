@@ -73,7 +73,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
 
         // check user belongs to this session
         const user = (client as any).user;
-        if (session.userId !== user.id && session.peerId !== user.id) {
+        if (session.userAId !== user.id && session.userBId !== user.id) {
             client.emit('error', { message: 'You are not part of this session' });
             return;
         }

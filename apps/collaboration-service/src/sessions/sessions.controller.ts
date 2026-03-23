@@ -13,12 +13,12 @@ export class SessionsController {
 
     @Post('create')
     async create(@Body() body: {
-        userId: string;
-        peerId: string;
+        userAId: string;
+        userBId: string;
         matchId: string;
         topic: string;
-        userDifficulty: string;
-        peerDifficulty: string;
+        userADifficulty: string;
+        userBDifficulty: string;
     }) {
         return this.sessionsService.create(body);
     }
@@ -31,7 +31,7 @@ export class SessionsController {
 
         // ensure requesting user belongs to this session
         const userId = req.user?.id;
-        if (session.userId !== userId && session.peerId !== userId) {
+        if (session.userAId !== userId && session.userBId !== userId) {
             throw new ForbiddenException('You are not part of this session');
         }
 
@@ -46,7 +46,7 @@ export class SessionsController {
 
         // ensure requesting user belongs to this session
         const userId = req.user?.id;
-        if (session.userId !== userId && session.peerId !== userId) {
+        if (session.userAId !== userId && session.userBId !== userId) {
             throw new ForbiddenException('You are not part of this session');
         }
 
