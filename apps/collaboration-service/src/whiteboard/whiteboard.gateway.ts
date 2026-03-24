@@ -153,4 +153,28 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
     ) {
         client.to(data.sessionId).emit('voice:end');
     }
+
+    @SubscribeMessage('hint:request')
+    handleHintRequest(
+        @MessageBody() data: { sessionId: string; hintIndex: number },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('hint:request', { hintIndex: data.hintIndex });
+    }
+
+    @SubscribeMessage('hint:approve')
+    handleHintApprove(
+        @MessageBody() data: { sessionId: string; hintIndex: number },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('hint:approve', { hintIndex: data.hintIndex });
+    }
+
+    @SubscribeMessage('hint:decline')
+    handleHintDecline(
+        @MessageBody() data: { sessionId: string },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('hint:decline');
+    }
 }

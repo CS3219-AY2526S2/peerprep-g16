@@ -214,7 +214,12 @@ function Collaboration() {
                         </div>
                     </div>
 
-                    <HintPanel hints={question?.hints ?? []} />
+                    <HintPanel
+                        hints={question?.hints ?? []}
+                        socket={socket}
+                        sessionId={matchingId}
+                        userId={userId}
+                    />
                 </div>
 
                 <div style={styles.rightColumn}>
