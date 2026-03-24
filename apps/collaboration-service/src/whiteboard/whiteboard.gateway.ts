@@ -121,4 +121,36 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         }
         client.emit('codeState', { code: session.code, language: session.language });
     }
+
+    @SubscribeMessage('voice:offer')
+    handleVoiceOffer(
+        @MessageBody() data: { sessionId: string; offer: RTCSessionDescriptionInit },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('voice:offer', { offer: data.offer });
+    }
+
+    @SubscribeMessage('voice:answer')
+    handleVoiceAnswer(
+        @MessageBody() data: { sessionId: string; answer: RTCSessionDescriptionInit },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('voice:answer', { answer: data.answer });
+    }
+
+    @SubscribeMessage('voice:ice-candidate')
+    handleIceCandidate(
+        @MessageBody() data: { sessionId: string; candidate: RTCIceCandidateInit },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('voice:ice-candidate', { candidate: data.candidate });
+    }
+
+    @SubscribeMessage('voice:end')
+    handleVoiceEnd(
+        @MessageBody() data: { sessionId: string },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('voice:end');
+    }
 }

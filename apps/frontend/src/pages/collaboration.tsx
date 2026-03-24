@@ -3,6 +3,7 @@ import { useParams, Navigate } from "react-router-dom";
 import Whiteboard from "../components/collaboration/Whiteboard";
 import CodeSpace from "../components/collaboration/CodeSpace";
 import HintPanel from "../components/collaboration/HintPanel";
+import VoiceCall from "../components/collaboration/VoiceCall";
 import {
     connectSocket,
     disconnectSocket,
@@ -157,6 +158,8 @@ function Collaboration() {
                     <div style={{ ...styles.statusDot, background: COLORS[connectionState] }} />
                     <span style={styles.sessionText}>{connectionState}</span>
                 </div>
+
+                <VoiceCall socket={socket} sessionId={matchingId} />
 
                 <button onClick={handleEndSession} style={styles.endButton}>
                     End Session
