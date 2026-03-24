@@ -12,6 +12,7 @@ export interface Session {
     whiteboardElements: any[];
     code: string;
     language: string;
+    revealedHints: number;
     status: 'waiting' | 'active' | 'ended';  // added 'waiting'
     createdAt: Date;
 }
@@ -69,6 +70,7 @@ export class SessionsService {
             whiteboardElements: [],
             code: '',
             language: 'python',
+            revealedHints: 0,
             status: 'waiting',
             createdAt: new Date(),
         };
@@ -163,6 +165,11 @@ export class SessionsService {
      * Updates shared code editor content for a session.
      * Called internally by WhiteboardGateway on 'codeUpdate' event.
      */
+    updateRevealedHints(sessionId: string, count: number): void {
+        const session = this.sessions.get(sessionId);
+        if (session) session.revealedHints = count;
+    }
+
     updateCode(sessionId: string, code: string, language?: string): void {
         const session = this.sessions.get(sessionId);
         if (session) {

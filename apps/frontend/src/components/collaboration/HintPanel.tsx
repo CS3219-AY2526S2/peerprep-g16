@@ -21,6 +21,10 @@ export default function HintPanel({ hints = [], socket, sessionId }: HintPanelPr
     useEffect(() => {
         if (!socket) return;
 
+        const handleHintState = ({ revealedCount: count }: { revealedCount: number }) => {
+            setRevealedCount(count);
+        };
+
         const handleHintRequest = ({ hintIndex }: { hintIndex: number }) => {
             setIncomingRequest(hintIndex);
             setIsOpen(true);
@@ -36,11 +40,13 @@ export default function HintPanel({ hints = [], socket, sessionId }: HintPanelPr
             declineTimerRef.current = setTimeout(() => setRequestState("idle"), 2000);
         };
 
+        socket.on("hintState", handleHintState);
         socket.on("hint:request", handleHintRequest);
         socket.on("hint:approve", handleHintApprove);
         socket.on("hint:decline", handleHintDecline);
 
         return () => {
+            socket.off("hintState", handleHintState);
             socket.off("hint:request", handleHintRequest);
             socket.off("hint:approve", handleHintApprove);
             socket.off("hint:decline", handleHintDecline);

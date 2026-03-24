@@ -82,6 +82,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         console.log(`User ${user.id} joined session ${data.sessionId}`);
         client.emit('whiteboardState', { elements: session.whiteboardElements });
         client.emit('codeState', { code: session.code, language: session.language });
+        client.emit('hintState', { revealedCount: session.revealedHints });
     }
 
     @SubscribeMessage('whiteboardUpdate')
@@ -167,6 +168,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string; hintIndex: number },
         @ConnectedSocket() client: Socket,
     ) {
+        this.sessionsService.updateRevealedHints(data.sessionId, data.hintIndex + 1);
         client.to(data.sessionId).emit('hint:approve', { hintIndex: data.hintIndex });
     }
 
