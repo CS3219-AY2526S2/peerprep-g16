@@ -241,18 +241,39 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     }
 
     private getMockQuestion(topic: string): any {
+        // return {
+        //     questionId: 'MOCK-001',
+        //     title: `Mock ${topic} Question`,
+        //     topic,
+        //     difficulty: 'Easy',
+        //     description: 'This is a placeholder question — Question Service did not respond in time.',
+        //     constraints: ['1 ≤ n ≤ 10⁴'],
+        //     examples: [],
+        //     hints: ['Try a brute force approach first.', 'Can you improve the time complexity?'],
+        //     testCases: {
+        //         sample: [{ input: 'input1', expectedOutput: 'output1' }],
+        //         hidden: [],
+        //     },
+        // };
         return {
-            questionId: 'MOCK-001',
-            title: `Mock ${topic} Question`,
-            topic,
+            questionId: 'binary-search',
+            title: 'Binary Search',
+            topic: ['Binary Search', 'Math'],
             difficulty: 'Easy',
-            description: 'This is a placeholder question — Question Service did not respond in time.',
-            constraints: ['1 ≤ n ≤ 10⁴'],
+            description: 'Given an array of integers nums sorted in ascending order and an integer target, write a function to search for target in nums. If target exists return its index, otherwise return -1.',
+            constraints: ['1 <= nums.length <= 10^4'],
             examples: [],
-            hints: ['Try a brute force approach first.', 'Can you improve the time complexity?'],
+            hints: [
+                'Compare the target with the middle element and eliminate half the array each time',
+                '123',
+            ],
             testCases: {
-                sample: [{ input: 'input1', expectedOutput: 'output1' }],
-                hidden: [],
+                sample: [
+                    { input: 'nums = [-1,0,3,5,9,12], target = 9', expectedOutput: '4' },
+                ],
+                hidden: [
+                    { input: 'nums = [-1,0,3,5,9,12], target = 2', expectedOutput: '-1' },
+                ],
             },
         };
     }
