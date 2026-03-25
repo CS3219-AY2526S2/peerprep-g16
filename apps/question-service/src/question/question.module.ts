@@ -6,6 +6,8 @@ import { QuestionController } from './question.controller';
 import { QuestionService } from './question.service';
 import { RedisStreamsListeners } from 'src/redis/redis-streams.listener';
 import { QuestionAssignmentService } from './question-assignment.service';
+import { HttpModule } from '@nestjs/axios';
+import { CollaborationClient } from 'src/clients/collaboration.client';
 
 /**
  * Feature module for question management.
@@ -13,11 +15,18 @@ import { QuestionAssignmentService } from './question-assignment.service';
  */
 @Module({
   imports: [
+    HttpModule,
     MongooseModule.forFeature([
       { name: Question.name, schema: QuestionSchema },
     ]),
   ],
   controllers: [QuestionController],
-  providers: [QuestionService, AdminGuard, RedisStreamsListeners, QuestionAssignmentService],
+  providers: [
+    QuestionService, 
+    AdminGuard, 
+    RedisStreamsListeners, 
+    QuestionAssignmentService,
+    CollaborationClient,
+  ],
 })
 export class QuestionModule {}
