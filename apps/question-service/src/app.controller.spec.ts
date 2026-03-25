@@ -8,6 +8,7 @@ describe('QuestionController', () => {
 
   const mockQuestionService = {
     findAll: jest.fn(),
+    findTopics: jest.fn(),
     create: jest.fn(),
     deleteByQuestionId: jest.fn(),
     updateByQuestionId: jest.fn(),
@@ -113,6 +114,21 @@ describe('QuestionController', () => {
 
       await expect(controller.create(body)).resolves.toEqual(createdQuestion);
       expect(mockQuestionService.create).toHaveBeenCalledWith(body);
+    });
+  });
+
+  describe('findTopics', () => {
+    /**
+     * Verifies that the controller returns the list of available
+     * topics provided by the service layer.
+     */
+    it('should return the list of available topics', async () => {
+      const topics = ['Arrays', 'Dynamic Programming', 'Graphs'];
+
+      mockQuestionService.findTopics.mockResolvedValue(topics);
+
+      await expect(controller.findTopics()).resolves.toEqual({ topics });
+      expect(mockQuestionService.findTopics).toHaveBeenCalled();
     });
   });
 
