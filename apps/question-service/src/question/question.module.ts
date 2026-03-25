@@ -4,6 +4,8 @@ import { AdminGuard } from '../auth/admin.guard';
 import { Question, QuestionSchema } from './schemas/question.schema';
 import { QuestionController } from './question.controller';
 import { QuestionService } from './question.service';
+import { RedisStreamsListeners } from 'src/redis/redis-streams.listener';
+import { QuestionAssignmentService } from './question-assignment.service';
 
 /**
  * Feature module for question management.
@@ -16,6 +18,6 @@ import { QuestionService } from './question.service';
     ]),
   ],
   controllers: [QuestionController],
-  providers: [QuestionService, AdminGuard],
+  providers: [QuestionService, AdminGuard, RedisStreamsListeners, QuestionAssignmentService],
 })
 export class QuestionModule {}
