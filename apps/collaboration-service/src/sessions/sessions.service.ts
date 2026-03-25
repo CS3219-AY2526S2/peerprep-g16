@@ -20,6 +20,7 @@ export interface Session {
 
 const REDIS_PREFIX = 'collab:session:';
 const FLUSH_DELAY_MS = 5000;
+const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 
 @Injectable()
 export class SessionsService implements OnModuleInit, OnModuleDestroy {
@@ -28,6 +29,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     private io: Server | null = null;
     private redis: Redis;
     private flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    private questionTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
 
     constructor(private readonly configService: ConfigService) {
         const redisUrl = this.configService.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
@@ -46,7 +48,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     }
 
     async onModuleDestroy() {
-        // Flush all pending timers before shutdown
+        for (const timer of this.questionTimeouts.values()) clearTimeout(timer);
         for (const [sessionId, timer] of this.flushTimers) {
             clearTimeout(timer);
             await this.flushToRedis(sessionId);
@@ -133,11 +135,47 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         // Persist immediately so a crash right after creation doesn't lose it
         await this.flushToRedis(data.matchId);
 
-        this.fetchAndAttachQuestion(data).catch(err =>
-            this.logger.error(`Failed to fetch question for ${data.matchId}: ${err.message}`)
-        );
+        // Fall back to mock question if Question Service doesn't respond in time
+        const timeoutMs = this.configService.get<number>('QUESTION_TIMEOUT_MS') ?? DEFAULT_QUESTION_TIMEOUT_MS;
+        const timer = setTimeout(async () => {
+            this.questionTimeouts.delete(data.matchId);
+            const s = this.sessions.get(data.matchId);
+            if (!s || s.status !== 'waiting') return; // question already arrived
+            this.logger.warn(`Question Service timed out for ${data.matchId} — using mock question`);
+            await this.attachQuestion(data.matchId, this.getMockQuestion(data.topic));
+        }, timeoutMs);
+        this.questionTimeouts.set(data.matchId, timer);
 
         return session;
+    }
+
+    /**
+     * Called by Question Service once it has selected a question for this session.
+     * Sets session status to 'active' and pushes 'questionReady' to both users.
+     *
+     * POST /sessions/:id/question
+     * Body: { question: Question }
+     */
+    async attachQuestion(sessionId: string, question: any): Promise<void> {
+        const session = this.sessions.get(sessionId);
+        if (!session) throw new Error(`Session not found: ${sessionId}`);
+
+        // Cancel the fallback timer if Question Service responded in time
+        const timer = this.questionTimeouts.get(sessionId);
+        if (timer) {
+            clearTimeout(timer);
+            this.questionTimeouts.delete(sessionId);
+        }
+
+        session.question = question;
+        session.status = 'active';
+        this.logger.log(`Question attached by Question Service, session active: ${sessionId}`);
+
+        await this.flushToRedis(sessionId);
+
+        if (this.io) {
+            this.io.to(sessionId).emit('questionReady', { question });
+        }
     }
 
     findOne(sessionId: string): Session | undefined {
@@ -149,6 +187,13 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         if (!session) return undefined;
 
         session.status = 'ended';
+
+        // Cancel question fallback timer if session ends before it fires
+        const qTimer = this.questionTimeouts.get(sessionId);
+        if (qTimer) {
+            clearTimeout(qTimer);
+            this.questionTimeouts.delete(sessionId);
+        }
 
         // Cancel any pending flush and do a final immediate write, then clean up
         const timer = this.flushTimers.get(sessionId);
@@ -195,85 +240,19 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         this.scheduleFlush(sessionId);
     }
 
-    // ─── Question fetching ────────────────────────────────────────────────────
-
-    private async fetchAndAttachQuestion(data: {
-        matchId: string;
-        topic: string;
-        userADifficulty: string;
-        userBDifficulty: string;
-        userAId: string;
-        userBId: string;
-    }): Promise<void> {
-        const question = await this.fetchQuestion(
-            data.topic,
-            data.userADifficulty,
-            data.userBDifficulty,
-            data.userAId,
-            data.userBId,
-        );
-
-        const session = this.sessions.get(data.matchId);
-        if (!session) return;
-
-        session.question = question;
-        session.status = 'active';
-        this.logger.log(`Question attached, session active: ${data.matchId}`);
-
-        await this.flushToRedis(data.matchId);
-
-        if (this.io) {
-            this.io.to(data.matchId).emit('questionReady', { question });
-        }
-    }
-
-    private async fetchQuestion(
-        topic: string,
-        userADifficulty: string,
-        userBDifficulty: string,
-        userAId: string,
-        userBId: string,
-    ): Promise<any> {
-        const questionServiceUrl = this.configService.get<string>('QUESTION_SERVICE_URL');
-
-        if (!questionServiceUrl) {
-            this.logger.warn('QUESTION_SERVICE_URL not set — using mock question');
-            return this.getMockQuestion(topic);
-        }
-
-        try {
-            const url = `${questionServiceUrl}/questions/match?topic=${topic}&userADifficulty=${userADifficulty}&userBDifficulty=${userBDifficulty}&userAId=${userAId}&userBId=${userBId}`;
-            const response = await fetch(url);
-            if (!response.ok) {
-                this.logger.warn('Question Service error — falling back to mock');
-                return this.getMockQuestion(topic);
-            }
-            return await response.json();
-        } catch (err) {
-            this.logger.warn('Could not reach Question Service — falling back to mock');
-            return this.getMockQuestion(topic);
-        }
-    }
-
     private getMockQuestion(topic: string): any {
         return {
             questionId: 'MOCK-001',
             title: `Mock ${topic} Question`,
             topic,
             difficulty: 'Easy',
-            description: 'This is a placeholder question. Question Service is not yet connected.',
-            constraints: ['Constraint 1', 'Constraint 2'],
-            examples: ['Example 1', 'Example 2'],
-            hints: ['Hint 1', 'Hint 2'],
+            description: 'This is a placeholder question — Question Service did not respond in time.',
+            constraints: ['1 ≤ n ≤ 10⁴'],
+            examples: [],
+            hints: ['Try a brute force approach first.', 'Can you improve the time complexity?'],
             testCases: {
-                sample: [
-                    { input: 'input1', expectedOutput: 'output1' },
-                    { input: 'input2', expectedOutput: 'output2' },
-                ],
-                hidden: [
-                    { input: 'hiddenInput1', expectedOutput: 'hiddenOutput1' },
-                    { input: 'hiddenInput2', expectedOutput: 'hiddenOutput2' },
-                ],
+                sample: [{ input: 'input1', expectedOutput: 'output1' }],
+                hidden: [],
             },
         };
     }
