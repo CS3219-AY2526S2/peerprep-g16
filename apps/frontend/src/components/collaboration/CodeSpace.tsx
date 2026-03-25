@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { Socket } from "socket.io-client";
 
 interface TestCase {
@@ -25,19 +25,40 @@ interface CodeSpaceProps {
     userId: string;
     socket: Socket | null;
     testCases?: TestCase[];
+    questionId?: string;
 }
 
-const STARTER_CODE = `# Write your solution here
-# Input is given via stdin — each value on its own line.
-# Example: read a list then a number:
-#   nums = list(map(int, input().split()))
-#   target = int(input())
+const STARTER_CODE = `# Write your solution here\n`;
 
-def solve():
-    pass
+function generateStarterCode(questionId: string, testCases: TestCase[]): string {
+    const fnName = questionId.replace(/-/g, "_");
+    const firstInput = String(testCases[0]?.input ?? "");
+    const lines = firstInput.split("\n").filter(Boolean);
 
-print(solve())
-`;
+    if (lines.length === 0) return STARTER_CODE;
+
+    const params = lines.map((_, i) => `arg${i + 1}`);
+    const parseLines = lines.map((line, i) => {
+        const tokens = line.trim().split(/\s+/);
+        if (tokens.length > 1 && tokens.every(t => !isNaN(Number(t)))) {
+            return `${params[i]} = list(map(int, input().split()))`;
+        }
+        if (tokens.length === 1 && !isNaN(Number(tokens[0]))) {
+            return `${params[i]} = int(input())`;
+        }
+        return `${params[i]} = input()`;
+    });
+
+    return [
+        ...parseLines,
+        "",
+        `def ${fnName}(${params.join(", ")}):`,
+        "    pass",
+        "",
+        `print(${fnName}(${params.join(", ")}))`,
+        "",
+    ].join("\n");
+}
 
 
 async function executeCode(
@@ -59,19 +80,32 @@ async function executeCode(
 }
 
 export default function CodeSpace({
-    isExpanded, onToggle, sessionId, userId, socket, testCases = [],
+    isExpanded, onToggle, sessionId, userId, socket, testCases = [], questionId,
 }: CodeSpaceProps) {
     const [code, setCode] = useState(STARTER_CODE);
     const [language, setLanguage] = useState("python");
     const [isRunning, setIsRunning] = useState(false);
     const [peerRunning, setPeerRunning] = useState(false);
     const [runOutput, setRunOutput] = useState<RunOutput | null>(null);
+    const hasServerCode = useRef(false);
+
+    // Auto-generate boilerplate when question loads, but only if no code was saved server-side
+    useEffect(() => {
+        if (!questionId || testCases.length === 0) return;
+        if (hasServerCode.current) return;
+        const generated = generateStarterCode(questionId, testCases);
+        setCode(generated);
+        socket?.emit("codeUpdate", { sessionId, userId, code: generated, language });
+    }, [questionId, testCases]);
 
     useEffect(() => {
         if (!socket) return;
 
         socket.on("codeState", (payload: { code: string; language: string }) => {
-            if (payload.code) setCode(payload.code);
+            if (payload.code) {
+                setCode(payload.code);
+                hasServerCode.current = true;
+            }
             if (payload.language) setLanguage(payload.language);
         });
 
