@@ -14,6 +14,7 @@ export interface Session {
     code: string;
     language: string;
     revealedHints: number;
+    testCasesPassed: number;
     status: 'waiting' | 'active' | 'ended';
     createdAt: Date;
 }
@@ -125,6 +126,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             code: '',
             language: 'python',
             revealedHints: 0,
+            testCasesPassed: 0,
             status: 'waiting',
             createdAt: new Date(),
         };
@@ -202,8 +204,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             this.flushTimers.delete(sessionId);
         }
 
-        // TODO: send final state to User Service here before deleting
-        // await this.saveAttemptToUserService(session);
+        await this.saveAttemptToUserService(session);
 
         this.sessions.delete(sessionId);
         try {
@@ -238,6 +239,40 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         if (!session) return;
         session.revealedHints = count;
         this.scheduleFlush(sessionId);
+    }
+
+    updateTestCasesPassed(sessionId: string, count: number): void {
+        const session = this.sessions.get(sessionId);
+        if (!session) return;
+        session.testCasesPassed = count;
+        this.scheduleFlush(sessionId);
+    }
+
+    private async saveAttemptToUserService(session: Session): Promise<void> {
+        const userServiceUrl = this.configService.get<string>('USER_SERVICE_URL') ?? 'http://localhost:3001';
+        try {
+            await fetch(`${userServiceUrl}/users/session-complete`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: session.sessionId,
+                    userAId: session.userAId,
+                    userBId: session.userBId,
+                    questionId: session.question?.questionId ?? null,
+                    questionTitle: session.question?.title ?? null,
+                    topic: session.question?.topic ?? null,
+                    difficulty: session.question?.difficulty ?? null,
+                    whiteboardSnapshot: session.whiteboardElements,
+                    finalCode: session.code,
+                    language: session.language,
+                    hintsUsed: session.revealedHints,
+                    testCasesPassed: session.testCasesPassed,
+                }),
+            });
+            this.logger.log(`Attempt saved to user service for session ${session.sessionId}`);
+        } catch (err) {
+            this.logger.warn(`Could not save attempt to user service: ${err.message}`);
+        }
     }
 
     private getMockQuestion(topic: string): any {

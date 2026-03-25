@@ -193,6 +193,35 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string; output: any },
         @ConnectedSocket() client: Socket,
     ) {
+        // Track how many test cases passed so it can be saved on session end
+        if (data.output?.type === 'tests' && Array.isArray(data.output.results)) {
+            const passed = data.output.results.filter((r: any) => r.passed).length;
+            this.sessionsService.updateTestCasesPassed(data.sessionId, passed);
+        }
         client.to(data.sessionId).emit('code:result', { output: data.output });
+    }
+
+    @SubscribeMessage('endSession:request')
+    handleEndSessionRequest(
+        @MessageBody() data: { sessionId: string },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('endSession:request');
+    }
+
+    @SubscribeMessage('endSession:decline')
+    handleEndSessionDecline(
+        @MessageBody() data: { sessionId: string },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('endSession:decline');
+    }
+
+    @SubscribeMessage('endSession:approve')
+    async handleEndSessionApprove(
+        @MessageBody() data: { sessionId: string },
+    ) {
+        await this.sessionsService.endSession(data.sessionId);
+        this.server.to(data.sessionId).emit('endSession:confirmed');
     }
 }

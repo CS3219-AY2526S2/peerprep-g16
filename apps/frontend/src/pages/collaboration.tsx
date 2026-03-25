@@ -8,7 +8,6 @@ import {
     connectSocket,
     disconnectSocket,
     fetchSession,
-    endSession,
 } from "../api/collaborationService";
 import { Socket } from "socket.io-client";
 
@@ -42,6 +41,8 @@ function Collaboration() {
     "Connected" | "Connecting" | "Disconnected"
         > ("Connecting");
     const [socket, setSocket] = useState<Socket | null>(null);
+    const [endSessionState, setEndSessionState] = useState<"idle" | "pending" | "declined">("idle");
+    const [incomingEndRequest, setIncomingEndRequest] = useState(false);
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -78,6 +79,21 @@ function Collaboration() {
                     if (mounted) setConnectionState("Disconnected");
                 });
 
+                connectedSocket.on("endSession:request", () => {
+                    if (mounted) setIncomingEndRequest(true);
+                });
+
+                connectedSocket.on("endSession:decline", () => {
+                    if (mounted) {
+                        setEndSessionState("declined");
+                        setTimeout(() => setEndSessionState("idle"), 2000);
+                    }
+                });
+
+                connectedSocket.on("endSession:confirmed", () => {
+                    window.location.href = "/homepage";
+                });
+
                 if (session.status === "waiting") {
                     connectedSocket.on("questionReady", ({ question: q }: { question: Question }) => {
                         if (mounted) {
@@ -112,15 +128,20 @@ function Collaboration() {
         };
     }, [matchingId, userId]);
 
-    const handleEndSession = async () => {
-        const confirmed = window.confirm("Are you sure you want to end the session?");
-        if (!confirmed) return;
-        try {
-            await endSession(matchingId);
-            window.location.href = "/homepage";
-        } catch (err) {
-            console.error("Failed to end session", err);
-        }
+    const handleEndSession = () => {
+        if (!socket || endSessionState !== "idle") return;
+        setEndSessionState("pending");
+        socket.emit("endSession:request", { sessionId: matchingId });
+    };
+
+    const handleApproveEnd = () => {
+        socket?.emit("endSession:approve", { sessionId: matchingId });
+        setIncomingEndRequest(false);
+    };
+
+    const handleDeclineEnd = () => {
+        socket?.emit("endSession:decline", { sessionId: matchingId });
+        setIncomingEndRequest(false);
     };
 
     const showCode = () => { setCodeExpanded(true); setActivePanel("code"); };
@@ -161,10 +182,29 @@ function Collaboration() {
 
                 <VoiceCall socket={socket} sessionId={matchingId} />
 
-                <button onClick={handleEndSession} style={styles.endButton}>
-                    End Session
+                <button
+                    onClick={handleEndSession}
+                    disabled={endSessionState !== "idle"}
+                    style={{
+                        ...styles.endButton,
+                        opacity: endSessionState !== "idle" ? 0.6 : 1,
+                        cursor: endSessionState !== "idle" ? "not-allowed" : "pointer",
+                        background: endSessionState === "declined" ? "#dd842b" : "#e63946",
+                    }}
+                >
+                    {endSessionState === "pending" ? "Waiting for peer…" : endSessionState === "declined" ? "Peer declined" : "End Session"}
                 </button>
             </header>
+
+            {incomingEndRequest && (
+                <div style={styles.endRequestBanner}>
+                    <span style={{ fontSize: "14px", color: "#1a1a2e" }}>
+                        Your peer wants to end the session.
+                    </span>
+                    <button onClick={handleApproveEnd} style={styles.approveEndBtn}>Confirm</button>
+                    <button onClick={handleDeclineEnd} style={styles.declineEndBtn}>Cancel</button>
+                </div>
+            )}
 
             <div style={styles.layoutGrid}>
                 <div style={styles.questionColumn}>
@@ -307,4 +347,16 @@ const styles: Record<string, CSSProperties> = {
     rightColumn: { padding: "20px", display: "flex", gap: "16px", overflow: "hidden", height: "100%" },
     whiteboard: { minWidth: 0, height: 1000, transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
     codeSpace: { minWidth: 0, transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
+    endRequestBanner: {
+        display: "flex", alignItems: "center", gap: "12px", padding: "10px 28px",
+        background: "#fff3cd", borderBottom: "1px solid #ffc107",
+    },
+    approveEndBtn: {
+        padding: "5px 14px", background: "#e63946", color: "#fff",
+        border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: 600,
+    },
+    declineEndBtn: {
+        padding: "5px 14px", background: "transparent", color: "#495057",
+        border: "1px solid #adb5bd", borderRadius: "6px", cursor: "pointer", fontSize: "12px",
+    },
 };
