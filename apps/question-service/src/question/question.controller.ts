@@ -74,4 +74,19 @@ export class QuestionController {
   ) {
     return this.questionService.updateByQuestionId(questionId, body);
   }
+
+  /**
+   * Retrieves the list of unique topics available in the question bank.
+   *
+   * Example:
+   * GET /questions/topics
+   *
+   * @returns Object containing sorted unique topic names
+   */
+  @UseGuards(UserGuard)
+  @Get('topics')
+  async findTopics() {
+    const topics = await this.questionService.findTopics();
+    return { topics };
+  }
 }

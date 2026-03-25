@@ -1,11 +1,24 @@
 import {
   ForbiddenException,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ExecutionContext } from '@nestjs/common';
+import * as jwt from 'jsonwebtoken';
 import { AdminGuard } from './admin.guard';
+
+jest.mock('jsonwebtoken', () => ({
+  verify: jest.fn(),
+  TokenExpiredError: class TokenExpiredError extends Error {
+    expiredAt: Date;
+
+    constructor(message: string, expiredAt: Date) {
+      super(message);
+      this.name = 'TokenExpiredError';
+      this.expiredAt = expiredAt;
+    }
+  },
+}));
 
 describe('AdminGuard', () => {
   /**
@@ -35,16 +48,17 @@ describe('AdminGuard', () => {
     }) as ExecutionContext;
 
   /**
-   * Creates a mock ConfigService that returns a predefined USER_SERVICE_URL.
-   * This allows tests to control the authentication service endpoint without
-   * relying on environment variables.
+   * Creates a mock ConfigService that returns a predefined JWT_SECRET.
    *
-   * @param userServiceUrl - base URL of the user-service
+   * @param jwtSecret - shared JWT secret used for token verification
    * @returns mocked ConfigService
    */
-  const createConfigService = (userServiceUrl?: string): ConfigService =>
+  const createConfigService = (jwtSecret?: string): ConfigService =>
     ({
-      get: jest.fn().mockReturnValue(userServiceUrl),
+      get: jest.fn().mockImplementation((key: string) => {
+        if (key === 'JWT_SECRET') return jwtSecret;
+        return undefined;
+      }),
     }) as unknown as ConfigService;
 
   /**
@@ -52,7 +66,7 @@ describe('AdminGuard', () => {
    * between tests.
    */
   beforeEach(() => {
-    jest.restoreAllMocks();
+    jest.clearAllMocks();
   });
 
   /**
@@ -60,7 +74,7 @@ describe('AdminGuard', () => {
    * The guard should immediately throw an UnauthorizedException.
    */
   it('rejects requests without an authorization header', async () => {
-    const guard = new AdminGuard(createConfigService('http://user-service:3000'));
+    const guard = new AdminGuard(createConfigService('secret'));
     const request = { headers: {} };
 
     await expect(
@@ -73,21 +87,13 @@ describe('AdminGuard', () => {
    * The guard should attach the verified user payload to the request object.
    */
   it('allows admin users and stores the verified user on the request', async () => {
-    const guard = new AdminGuard(createConfigService('http://user-service:3000'));
+    const guard = new AdminGuard(createConfigService('secret'));
     const request = getRequest();
 
-    jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        data: {
-          id: '1',
-          username: 'admin',
-          email: 'admin@example.com',
-          isAdmin: true,
-        },
-      }),
-    } as Response);
+    (jwt.verify as jest.Mock).mockReturnValue({
+      id: '1',
+      isAdmin: true,
+    });
 
     await expect(
       guard.canActivate(createExecutionContext(request)),
@@ -95,8 +101,6 @@ describe('AdminGuard', () => {
 
     expect(request.user).toEqual({
       id: '1',
-      username: 'admin',
-      email: 'admin@example.com',
       isAdmin: true,
     });
   });
@@ -106,20 +110,12 @@ describe('AdminGuard', () => {
    * The guard should throw a ForbiddenException.
    */
   it('rejects authenticated non-admin users', async () => {
-    const guard = new AdminGuard(createConfigService('http://user-service:3000'));
+    const guard = new AdminGuard(createConfigService('secret'));
 
-    jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        data: {
-          id: '2',
-          username: 'user',
-          email: 'user@example.com',
-          isAdmin: false,
-        },
-      }),
-    } as Response);
+    (jwt.verify as jest.Mock).mockReturnValue({
+      id: '2',
+      isAdmin: false,
+    } as any);
 
     await expect(
       guard.canActivate(createExecutionContext(getRequest())),
@@ -131,13 +127,12 @@ describe('AdminGuard', () => {
    * The guard should throw an UnauthorizedException.
    */
   it('rejects invalid tokens', async () => {
-    const guard = new AdminGuard(createConfigService('http://user-service:3000'));
+    const guard = new AdminGuard(createConfigService('secret'));
 
-    jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: false,
-      status: 401,
-      json: async () => ({}),
-    } as Response);
+    (jwt.verify as jest.Mock).mockImplementation(() => {
+      throw new Error('invalid token');
+    });
+
 
     await expect(
       guard.canActivate(createExecutionContext(getRequest())),
@@ -145,48 +140,30 @@ describe('AdminGuard', () => {
   });
 
   /**
-   * Ensures that the guard throws an error when USER_SERVICE_URL
+   * Ensures that the guard throws an error when JWT_SECRET
    * is not configured.
    */
-  it('throws an error when USER_SERVICE_URL is not configured', async () => {
+  it('throws an error when JWT_SECRET is not configured', async () => {
     const guard = new AdminGuard(createConfigService());
 
     await expect(
       guard.canActivate(createExecutionContext(getRequest())),
-    ).rejects.toThrow('USER_SERVICE_URL not configured');
+    ).rejects.toThrow('JWT_SECRET not configured');
   });
 
   /**
-   * Ensures that a non-OK response from the authentication service
-   * results in a ServiceUnavailableException.
+   * Ensures that expired tokens result in authentication failure.
+   * The guard should throw an UnauthorizedException.
    */
-  it('returns service unavailable when the auth service responds with a non-OK status', async () => {
-    const guard = new AdminGuard(createConfigService('http://user-service:3000'));
+  it('rejects expired tokens', async () => {
+    const guard = new AdminGuard(createConfigService('secret'));
 
-    jest.spyOn(global, 'fetch').mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: async () => ({}),
-    } as Response);
+    (jwt.verify as jest.Mock).mockImplementation(() => {
+      throw new jwt.TokenExpiredError('jwt expired', new Date());
+    });
 
     await expect(
       guard.canActivate(createExecutionContext(getRequest())),
-    ).rejects.toThrow(ServiceUnavailableException);
-  });
-
-  /**
-   * Ensures that network errors during token verification
-   * result in a ServiceUnavailableException.
-   */
-  it('returns service unavailable when fetch throws a network error', async () => {
-    const guard = new AdminGuard(createConfigService('http://user-service:3000'));
-
-    jest
-      .spyOn(global, 'fetch')
-      .mockRejectedValue(new Error('network unavailable'));
-
-    await expect(
-      guard.canActivate(createExecutionContext(getRequest())),
-    ).rejects.toThrow(ServiceUnavailableException);
+    ).rejects.toThrow(UnauthorizedException);
   });
 });

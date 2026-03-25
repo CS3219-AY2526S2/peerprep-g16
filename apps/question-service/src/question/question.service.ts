@@ -93,4 +93,20 @@ export class QuestionService {
 
     return updated;
   }
+
+  /**
+   * Retrieves all unique topics from the question bank.
+   *
+   * Since `topic` is stored as a string array on each question,
+   * MongoDB distinct will return the unique topic values across
+   * all documents.
+   *
+   * @returns Promise resolving to a sorted list of unique topics
+   */
+  async findTopics(): Promise<string[]> {
+    const topics = await this.questionModel.distinct('topic').exec();
+
+    return topics.sort((a, b) => a.localeCompare(b));
+  }
+
 }
