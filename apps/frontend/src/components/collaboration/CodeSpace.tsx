@@ -28,8 +28,14 @@ interface CodeSpaceProps {
 }
 
 const STARTER_CODE = `# Write your solution here
+# Input is given via stdin — each value on its own line.
+# Example: read a list then a number:
+#   nums = list(map(int, input().split()))
+#   target = int(input())
+
 def solve():
     pass
+
 print(solve())
 `;
 

@@ -269,10 +269,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             ],
             testCases: {
                 sample: [
-                    { input: 'nums = [-1,0,3,5,9,12], target = 9', expectedOutput: '4' },
+                    { input: '-1 0 3 5 9 12\n9', expectedOutput: '4' },
                 ],
                 hidden: [
-                    { input: 'nums = [-1,0,3,5,9,12], target = 2', expectedOutput: '-1' },
+                    { input: '-1 0 3 5 9 12\n2', expectedOutput: '-1' },
                 ],
             },
         };
