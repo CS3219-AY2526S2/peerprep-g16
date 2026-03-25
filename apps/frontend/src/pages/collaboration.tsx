@@ -237,6 +237,7 @@ function Collaboration() {
                             sessionId={matchingId}
                             userId={userId}
                             socket={socket}
+                            testCases={question?.testCases.sample ?? []}
                         />
                     </div>
                 </div>

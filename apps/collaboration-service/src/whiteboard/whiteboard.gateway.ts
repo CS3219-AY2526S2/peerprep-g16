@@ -179,4 +179,20 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
     ) {
         client.to(data.sessionId).emit('hint:decline');
     }
+
+    @SubscribeMessage('code:run')
+    handleCodeRun(
+        @MessageBody() data: { sessionId: string },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('code:run');
+    }
+
+    @SubscribeMessage('code:result')
+    handleCodeResult(
+        @MessageBody() data: { sessionId: string; output: any },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('code:result', { output: data.output });
+    }
 }
