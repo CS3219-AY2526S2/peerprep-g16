@@ -3,10 +3,12 @@ import { MatchService } from './match.service';
 import { RedisService } from '../redis/redis.service';
 import { SimulateMatchDto } from './dto/simulate-match.dto';
 
-@Controller('match')
+@Controller('api/match')
 export class MatchController {
-    constructor(private readonly matchService: MatchingService) {}
-
+  constructor(
+    private readonly matchService: MatchService,
+    private readonly redisService: RedisService,
+  ) {}
     @Post()
     async joinQueue(@Body() body: any) {
         const { userId, username, topic, difficulty } = body;
@@ -26,16 +28,6 @@ export class MatchController {
         await this.matchService.leaveQueue(userId);
         return { message: 'Left queue successfully' };
     }
-}
-
-
-@Controller('api/match')
-export class MatchController {
-  constructor(
-    private readonly matchService: MatchService,
-    private readonly redisService: RedisService,
-  ) {}
-
   /**
    * POST /api/match/simulate
    *

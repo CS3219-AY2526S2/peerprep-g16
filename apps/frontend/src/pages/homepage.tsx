@@ -1,68 +1,93 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import webStyles from "../components/styles";
 import api from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 
 function Homepage() {
     const navigate = useNavigate();
-    const [topic, setTopic] = React.useState("");
-    const [difficulty, setDifficulty] = React.useState("");
-    const [error, setError] = React.useState(false);
+    const [topic, setTopic] = useState("");
+    const [difficulty, setDifficulty] = useState("");
+    const [error, setError] = useState(false);
     const [isMatchmaking, setIsMatchmaking] = useState(false);
     const [matchStatus, setMatchStatus] = useState("Searching for a match...");
     const [elapsed, setElapsed] = useState(0);
-    const [pollInterval, setPollInterval] = useState<any>(null);
-    const [timerInterval, setTimerInterval] = useState<any>(null);
     const [isTimeout, setIsTimeout] = useState(false);
 
-    const handleMatchmake = async () => {
+    const pollRef = useRef<any>(null);
+    const timerRef = useRef<any>(null);
+    const hasStartedRef = useRef(false);
+    const isMatchedRef = useRef(false);
+
+    const stopAll = () => {
+        clearInterval(pollRef.current);
+        clearInterval(timerRef.current);
+        pollRef.current = null;
+        timerRef.current = null;
+    };
+
+    const handleMatchmake = () => {
         if (!topic) { setError(true); return; }
-        setIsMatchmaking(true);  // trigger render first
+        hasStartedRef.current = false;
+        isMatchedRef.current = false;
+        setIsMatchmaking(true);
         setElapsed(0);
         setMatchStatus("Searching for a match...");
         setIsTimeout(false);
     };
 
     useEffect(() => {
-        if (!isMatchmaking || isTimeout) return;
+        if (!isMatchmaking || isTimeout || hasStartedRef.current) return;
+        hasStartedRef.current = true;
 
         const stored = localStorage.getItem("login");
         const user = stored ? JSON.parse(stored) : null;
         if (!user) return;
 
-        const timer = setInterval(() => {
+        timerRef.current = setInterval(() => {
             setElapsed(prev => prev + 1);
         }, 1000);
-        setTimerInterval(timer);
 
         const start = async () => {
             try {
-                const response = await api.post("http://localhost:3004/match", {
+                const response = await api.post("http://localhost:3004/api/match", {
                     userId: user.id,
                     username: user.username,
                     topic,
                     difficulty: difficulty.toLowerCase(),
                 });
 
-                if (response.data.status === "matched") {
-                    handleMatchFound(response.data, timer);
-                } else {
-                    startPolling(user.id, timer);
+                if (response.data.status === 'already_in_queue' ||
+                    response.data.status === 'waiting') {
+                    startPolling(user.id);
+                    return;
                 }
+
+                if (response.data.status === 'already_matched') {
+                    const statusResponse = await api.get(`http://localhost:3004/api/match/${user.id}`);
+                    if (statusResponse.data.status === 'matched') {
+                        handleMatchFound(statusResponse.data);
+                        return;
+                    }
+                    startPolling(user.id);
+                    return;
+                }
+
             } catch (err) {
                 console.error(err);
-                cancelMatchmaking();
+                stopAll();
+                setIsMatchmaking(false);
             }
         };
 
         start();
 
-        return () => clearInterval(timer);
+        return () => stopAll();
     }, [isMatchmaking]);
 
-    const handleMatchFound = (data: any, timer?: any, poll?: any) => {
-        clearInterval(timer || timerInterval);
-        clearInterval(poll || pollInterval);
+    const handleMatchFound = (data: any) => {
+        if (isMatchedRef.current) return; // prevent double-firing
+        isMatchedRef.current = true;
+        stopAll();
         setMatchStatus("Match found! Redirecting...");
         setTimeout(() => {
             setIsMatchmaking(false);
@@ -71,8 +96,9 @@ function Homepage() {
     };
 
     const cancelMatchmaking = async () => {
-        clearInterval(timerInterval);
-        clearInterval(pollInterval);
+        stopAll();
+        hasStartedRef.current = false;
+        isMatchedRef.current = false;
         setIsMatchmaking(false);
         setElapsed(0);
         setIsTimeout(false);
@@ -81,36 +107,37 @@ function Homepage() {
         const user = stored ? JSON.parse(stored) : null;
         if (user) {
             try {
-                await api.delete(`http://localhost:3004/match/${user.id}`);
+                await api.delete(`http://localhost:3004/api/match/${user.id}`);
             } catch (err) {
                 console.error(err);
             }
         }
     };
 
-    const startPolling = (userId: string, timer: any) => {
-        const poll = setInterval(async () => {
+    const startPolling = (userId: string) => {
+        pollRef.current = setInterval(async () => {
+            if (isMatchedRef.current) {
+                clearInterval(pollRef.current);
+                return;
+            }
             try {
-                const statusResponse = await api.get(`http://localhost:3004/match/${userId}`);
+                const statusResponse = await api.get(`http://localhost:3004/api/match/${userId}`);
 
                 if (statusResponse.data.status === "matched") {
-                    handleMatchFound(statusResponse.data, timer, poll);
+                    handleMatchFound(statusResponse.data);
                 } else if (statusResponse.data.status === "expand_search_difficulty") {
                     setMatchStatus(statusResponse.data.message);
                 } else if (statusResponse.data.status === "timeout") {
-                    clearInterval(poll);
-                    clearInterval(timer);
-                    setPollInterval(null);
+                    stopAll();
                     setMatchStatus("No match found. Please try again later.");
                     setIsTimeout(true);
-                } else if (statusResponse.data.status == "waiting") {
+                } else if (statusResponse.data.status === "waiting") {
                     setMatchStatus(statusResponse.data.message);
                 }
             } catch (err) {
                 console.error(err);
             }
-        }, 1000); // poll every 1 second
-        setPollInterval(poll);
+        }, 1000);
     };
 
     return (

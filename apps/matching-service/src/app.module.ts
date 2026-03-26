@@ -5,7 +5,7 @@ import { RedisModule } from './redis/redis.module';
 import { MatchModule } from './match/match.module';
 
 @Module({
-  imports: [ConfigModule.forRoot(),RedisModule, MatchModule],
+  imports: [RedisModule, MatchModule],
   controllers: [AppController],
   providers: [AppService],
 })
