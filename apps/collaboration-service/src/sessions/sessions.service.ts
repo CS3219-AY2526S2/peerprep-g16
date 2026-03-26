@@ -23,6 +23,11 @@ const REDIS_PREFIX = 'collab:session:';
 const FLUSH_DELAY_MS = 5000;
 const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 
+const DIFFICULTY_RANK: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
+function minDifficulty(a: string, b: string): string {
+    return (DIFFICULTY_RANK[a] ?? 0) <= (DIFFICULTY_RANK[b] ?? 0) ? a : b;
+}
+
 @Injectable()
 export class SessionsService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(SessionsService.name);
@@ -204,7 +209,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             this.flushTimers.delete(sessionId);
         }
 
-        await this.saveAttemptToUserService(session);
+        await this.publishSessionCompleted(session);
 
         this.sessions.delete(sessionId);
         try {
@@ -248,30 +253,102 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         this.scheduleFlush(sessionId);
     }
 
-    private async saveAttemptToUserService(session: Session): Promise<void> {
+    // ─── Redis Streams integration ────────────────────────────────────────────
+
+    /**
+     * Entry point called by MatchConsumerService when a match.found event arrives.
+     * Creates the session then fetches user history + question in the background.
+     */
+    async createFromMatchEvent(data: {
+        matchId: string;
+        userAId: string;
+        userBId: string;
+        topic: string;
+        userADifficulty: string;
+        userBDifficulty: string;
+    }): Promise<void> {
+        await this.create(data);
+        // Fetch question async — timeout fallback in create() handles the case where this is slow
+        this.fetchAndAttachQuestion(
+            data.matchId,
+            data.userAId,
+            data.userBId,
+            data.topic,
+            data.userADifficulty,
+            data.userBDifficulty,
+        ).catch((err) => this.logger.error(`fetchAndAttachQuestion error: ${err.message}`));
+    }
+
+    private async fetchAndAttachQuestion(
+        sessionId: string,
+        userAId: string,
+        userBId: string,
+        topic: string,
+        userADifficulty: string,
+        userBDifficulty: string,
+    ): Promise<void> {
+        // Step 2: Fetch both users' attempted question IDs (best-effort; failure → empty exclude list)
+        const [historyA, historyB] = await Promise.all([
+            this.fetchUserHistory(userAId),
+            this.fetchUserHistory(userBId),
+        ]);
+        const exclude = [...new Set([...historyA, ...historyB])];
+
+        // Step 3: Fetch question from question service
+        const questionServiceUrl = this.configService.get<string>('QUESTION_SERVICE_URL') ?? 'http://localhost:3002';
+        const difficulty = minDifficulty(userADifficulty, userBDifficulty);
+        const params = new URLSearchParams({ topic, difficulty });
+        if (exclude.length > 0) params.set('exclude', exclude.join(','));
+
+        try {
+            const res = await fetch(`${questionServiceUrl}/questions/select?${params}`);
+            if (!res.ok) throw new Error(`Question service returned ${res.status}`);
+            const question = await res.json();
+
+            // Guard: don't overwrite if timeout fallback already fired
+            const session = this.sessions.get(sessionId);
+            if (!session || session.status !== 'waiting') {
+                this.logger.log(`Session ${sessionId} already active — skipping late question fetch`);
+                return;
+            }
+            await this.attachQuestion(sessionId, question);
+        } catch (err: any) {
+            this.logger.warn(`Question fetch failed (${err.message}) — timeout fallback will handle it`);
+        }
+    }
+
+    private async fetchUserHistory(userId: string): Promise<string[]> {
         const userServiceUrl = this.configService.get<string>('USER_SERVICE_URL') ?? 'http://localhost:3001';
         try {
-            await fetch(`${userServiceUrl}/users/session-complete`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: session.sessionId,
-                    userAId: session.userAId,
-                    userBId: session.userBId,
-                    questionId: session.question?.questionId ?? null,
-                    questionTitle: session.question?.title ?? null,
-                    topic: session.question?.topic ?? null,
-                    difficulty: session.question?.difficulty ?? null,
-                    whiteboardSnapshot: session.whiteboardElements,
-                    finalCode: session.code,
-                    language: session.language,
-                    hintsUsed: session.revealedHints,
-                    testCasesPassed: session.testCasesPassed,
-                }),
-            });
-            this.logger.log(`Attempt saved to user service for session ${session.sessionId}`);
-        } catch (err) {
-            this.logger.warn(`Could not save attempt to user service: ${err.message}`);
+            const res = await fetch(`${userServiceUrl}/users/${userId}/history`);
+            if (!res.ok) return [];
+            const data = await res.json() as any[];
+            return data.map((a) => a.questionId).filter(Boolean);
+        } catch {
+            return [];
+        }
+    }
+
+    private async publishSessionCompleted(session: Session): Promise<void> {
+        const duration = Date.now() - new Date(session.createdAt).getTime();
+        try {
+            await this.redis.xadd(
+                'session.completed', '*',
+                'userAId', session.userAId,
+                'userBId', session.userBId,
+                'questionId', session.question?.questionId ?? '',
+                'questionTitle', session.question?.title ?? '',
+                'topic', String(session.question?.topic ?? ''),
+                'difficulty', session.question?.difficulty ?? '',
+                'code', session.code,
+                'language', session.language,
+                'hintsUsed', String(session.revealedHints),
+                'testCasesPassed', String(session.testCasesPassed),
+                'duration', String(duration),
+            );
+            this.logger.log(`Published session.completed for ${session.sessionId}`);
+        } catch (err: any) {
+            this.logger.warn(`Failed to publish session.completed: ${err.message}`);
         }
     }
 

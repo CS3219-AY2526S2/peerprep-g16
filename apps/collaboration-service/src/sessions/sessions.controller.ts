@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, NotFoundException, BadRequestException, UseGuards, ForbiddenException, Req } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, NotFoundException, UseGuards, ForbiddenException, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { SessionsService } from './sessions.service';
 import { UserGuard } from '../auth/user.guard';
@@ -36,19 +36,6 @@ export class SessionsController {
         }
 
         return session;
-    }
-
-    // Called by Question Service (service-to-service, no user auth)
-    @Post(':id/question')
-    async attachQuestion(
-        @Param('id') id: string,
-        @Body() body: { question: any },
-    ) {
-        if (!body.question) throw new BadRequestException('question is required');
-        const session = this.sessionsService.findOne(id);
-        if (!session) throw new NotFoundException('Session not found');
-        await this.sessionsService.attachQuestion(id, body.question);
-        return { message: 'Question attached' };
     }
 
     @UseGuards(UserGuard)
