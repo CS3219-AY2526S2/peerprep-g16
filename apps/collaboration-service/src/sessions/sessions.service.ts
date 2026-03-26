@@ -8,7 +8,7 @@ export interface Session {
     userAId: string;
     userBId: string;
     matchId: string;
-    topic: string[];
+    topic: string;
     question: any;
     whiteboardElements: any[];
     code: string;
@@ -116,7 +116,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         userAId: string;
         userBId: string;
         matchId: string;
-        topic: string[];
+        topic: string;
         userADifficulty: string;
         userBDifficulty: string;
     }): Promise<Session> {
@@ -263,7 +263,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         matchId: string;
         userAId: string;
         userBId: string;
-        topic: string[];
+        topic: string;
         userADifficulty: string;
         userBDifficulty: string;
     }): Promise<void> {
@@ -283,7 +283,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         sessionId: string,
         userAId: string,
         userBId: string,
-        topic: string[],
+        topic: string,
         userADifficulty: string,
         userBDifficulty: string,
     ): Promise<void> {
@@ -292,16 +292,22 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             this.fetchUserHistory(userAId),
             this.fetchUserHistory(userBId),
         ]);
-        const exclude = [...new Set([...historyA, ...historyB])];
+        const attemptedQuestionIds = [...new Set([...historyA, ...historyB])];
 
         // Step 3: Fetch question from question service
         const questionServiceUrl = this.configService.get<string>('QUESTION_SERVICE_URL') ?? 'http://localhost:3002';
         const difficulty = minDifficulty(userADifficulty, userBDifficulty);
-        const params = new URLSearchParams({ topic: topic.join(','), difficulty });
-        if (exclude.length > 0) params.set('exclude', exclude.join(','));
 
         try {
-            const res = await fetch(`${questionServiceUrl}/questions/select?${params}`);
+            const res = await fetch(`${questionServiceUrl}/questions/select`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    topic,
+                    difficulty,
+                    attemptedQuestionIds,
+                }),
+            });
             if (!res.ok) throw new Error(`Question service returned ${res.status}`);
             const question = await res.json();
 
@@ -352,7 +358,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
-    private getMockQuestion(_topic: string[]): any {
+    private getMockQuestion(_topic: string): any {
         // return {
         //     questionId: 'MOCK-001',
         //     title: `Mock ${topic} Question`,
