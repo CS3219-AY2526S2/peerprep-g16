@@ -86,7 +86,7 @@ export async function getAllUsers(req, res) {
 export async function updateUser(req, res) {
   try {
     const { username, email, password, currentPassword } = req.body;
-    
+
     if (!username && !email && !password) {
       return res.status(400).json({ message: "No field to update: username, email and password are all missing!" });
     }
@@ -101,10 +101,10 @@ export async function updateUser(req, res) {
       return res.status(404).json({ message: `User ${userId} not found` });
     }
 
-    // Email or password update requires current password verification
-    if (email || password) {
+    // Password update requires currentPassword verification
+    if (password) {
       if (!currentPassword) {
-        return res.status(400).json({ message: "Current password is required to update email or password" });
+        return res.status(400).json({ message: "Current password is required to update password" });
       }
       const match = await bcrypt.compare(currentPassword, user.password);
       if (!match) {
@@ -152,6 +152,9 @@ export async function updateUser(req, res) {
 
   } catch (err) {
     console.error(err);
+    if (err.code === 11000) {
+      return res.status(409).json({ message: "Username or email already exists" });
+    }
     return res.status(500).json({ message: "Unknown error when updating user!" });
   }
 }

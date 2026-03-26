@@ -56,6 +56,8 @@ function AdminPage() {
     const [editSampleOutput, setEditSampleOutput] = useState("");
     const [editHiddenInput, setEditHiddenInput] = useState("");
     const [editHiddenOutput, setEditHiddenOutput] = useState("");
+    const [showTopicDropdown, setShowTopicDropdown] = useState(false);
+    const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
 
     useEffect(() => {
         fetchUsers();
@@ -68,6 +70,17 @@ function AdminPage() {
         setQuestionSuccess("");
         setQuestionError("");
     }, [activeTab]);
+
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (!target.closest('.topic-dropdown')) {
+                setShowTopicDropdown(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     const handleSort = (field: string) => {
         if (sortField === field) {
@@ -153,8 +166,12 @@ function AdminPage() {
     };
 
     const filteredQuestions = questions
-        .filter(q => filterTopic === "all" || (Array.isArray(q.topic) ? q.topic.includes(filterTopic) : q.topic === filterTopic))
-        .filter(q => filterDifficulty === "all" || q.difficulty === filterDifficulty)
+        .filter(q =>
+            selectedTopics.length === 0 ||
+            (Array.isArray(q.topic)
+                ? q.topic.some((t: string) => selectedTopics.includes(t))
+                : selectedTopics.includes(q.topic))
+        ).filter(q => filterDifficulty === "all" || q.difficulty === filterDifficulty)
         .filter(q =>
             q.questionId.toLowerCase().includes(questionSearchQuery.toLowerCase()) ||
             q.title.toLowerCase().includes(questionSearchQuery.toLowerCase())

@@ -69,7 +69,7 @@ function Profile() {
 
         try {
             await api.patch(`http://localhost:3001/users/${user?.id}`,
-                { password: newPassword },
+                { password: newPassword, currentPassword: currentPassword },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
             localStorage.setItem("login", JSON.stringify({

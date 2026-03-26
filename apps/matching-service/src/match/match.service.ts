@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+@import { Injectable, Logger } from '@nestjs/common';
 import { RedisService } from '../redis/redis.service';
-import { diff } from 'node:util';
+import { v4 as uuidv4 } from 'uuid';
 
 const QUEUE_KEY = 'matchmaking:queue';
 const STAGE1_TIMEOUT = 60000;
@@ -12,8 +12,12 @@ const DIFFICULTY_RANK = {
 };
 
 @Injectable()
-export class MatchingService {
-    constructor(private readonly redisService: RedisService) { }
+export class MatchService {
+  private readonly logger = new Logger(MatchService.name);
+  private readonly STREAM_NAME =
+    process.env.MATCH_FOUND_STREAM || 'match.found';
+
+  constructor(private readonly redisService: RedisService) {}
 
     private get client() {
         return this.redisService.getClient();
@@ -197,7 +201,71 @@ export class MatchingService {
         await this.client.zRem(QUEUE_KEY, userId);
         await this.client.del(`user:${userId}`);
     }
+
+  /**
+   * Publishes a match.found event to Redis Streams.
+   *
+   * Event payload matches what Collaboration Service expects:
+   * {
+   *   matchId: string,
+   *   userAId: string,
+   *   userBId: string,
+   *   topic: string,
+   *   userADifficulty: "Easy" | "Medium" | "Hard",
+   *   userBDifficulty: "Easy" | "Medium" | "Hard"
+   * }
+   *
+   * This will be called by:
+   * 1. The test endpoint (for now)
+   * 2. Your teammate's matching algorithm (later)
+   */
+  async publishMatchFound(
+    userAId: string,
+    userBId: string,
+    topic: string,
+    userADifficulty: string,
+    userBDifficulty: string,
+  ) {
+    const matchId = uuidv4();
+
+    const messageId = await this.redisService.publishToStream(
+      this.STREAM_NAME,
+      {
+        matchId,
+        userAId,
+        userBId,
+        topic,
+        userADifficulty,
+        userBDifficulty,
+        timestamp: new Date().toISOString(),
+      },
+    );
+
+    this.logger.log(
+      'Match found! ' +
+        userAId +
+        ' <-> ' +
+        userBId +
+        ' | Topic: ' +
+        topic +
+        ' | Difficulty: ' +
+        userADifficulty +
+        '/' +
+        userBDifficulty,
+    );
+
+    return {
+      matchId,
+      userAId,
+      userBId,
+      topic,
+      userADifficulty,
+      userBDifficulty,
+      streamMessageId: messageId,
+    };
+  }
 }
+
 function canMatch(originalSearchDiff : string, originalTargetDiff: string, searchDiff: string, targetDiff: string): boolean {
     if (originalSearchDiff == 'any' || originalTargetDiff == 'any') return true
     if (searchDiff == 'any' && targetDiff == 'any') return true
