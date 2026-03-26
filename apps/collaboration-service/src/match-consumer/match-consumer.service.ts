@@ -86,12 +86,21 @@ export class MatchConsumerService implements OnModuleInit, OnModuleDestroy {
             return;
         }
 
+        // topic arrives as a string from the stream — try JSON array first, then comma-split
+        let topics: string[];
+        try {
+            const parsed = JSON.parse(topic ?? '[]');
+            topics = Array.isArray(parsed) ? parsed : [topic];
+        } catch {
+            topics = topic ? topic.split(',').map((t) => t.trim()) : [];
+        }
+
         this.logger.log(`Received match.found: ${matchId}`);
         await this.sessionsService.createFromMatchEvent({
             matchId,
             userAId,
             userBId,
-            topic: topic ?? '',
+            topic: topics,
             userADifficulty: userADifficulty ?? 'Easy',
             userBDifficulty: userBDifficulty ?? 'Easy',
         });

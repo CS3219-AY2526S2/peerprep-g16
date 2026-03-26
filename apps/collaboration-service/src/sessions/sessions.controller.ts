@@ -16,7 +16,7 @@ export class SessionsController {
         userAId: string;
         userBId: string;
         matchId: string;
-        topic: string;
+        topic: string[];
         userADifficulty: string;
         userBDifficulty: string;
     }) {

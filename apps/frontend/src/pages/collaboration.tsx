@@ -16,7 +16,7 @@ type ActivePanel = "whiteboard" | "code";
 type Question = {
     questionId: string;
     title: string;
-    topic: string;
+    topic: string[];
     difficulty: "Easy" | "Medium" | "Hard";
     description: string;
     constraints: string[];
@@ -37,9 +37,9 @@ function Collaboration() {
     const [codeExpanded, setCodeExpanded] = useState(false);
     const [question, setQuestion] = useState<Question | null>(null);
     const [isLoading, setIsLoading] = useState(true);
-    const [connectionState, setConnectionState] = useState <
-    "Connected" | "Connecting" | "Disconnected"
-        > ("Connecting");
+    const [connectionState, setConnectionState] = useState<
+        "Connected" | "Connecting" | "Disconnected"
+    >("Connecting");
     const [socket, setSocket] = useState<Socket | null>(null);
     const [endSessionState, setEndSessionState] = useState<"idle" | "pending" | "declined">("idle");
     const [incomingEndRequest, setIncomingEndRequest] = useState(false);
@@ -225,7 +225,7 @@ function Collaboration() {
                                         </span>
                                     )}
                                     {question?.topic && (
-                                        <span style={styles.tag}>{question.topic}</span>
+                                        question?.topic.map(x => <span style={styles.tag}>{x}</span>)
                                     )}
                                 </div>
                             </div>

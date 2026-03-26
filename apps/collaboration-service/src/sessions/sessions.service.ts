@@ -8,7 +8,7 @@ export interface Session {
     userAId: string;
     userBId: string;
     matchId: string;
-    topic: string;
+    topic: string[];
     question: any;
     whiteboardElements: any[];
     code: string;
@@ -116,7 +116,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         userAId: string;
         userBId: string;
         matchId: string;
-        topic: string;
+        topic: string[];
         userADifficulty: string;
         userBDifficulty: string;
     }): Promise<Session> {
@@ -263,7 +263,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         matchId: string;
         userAId: string;
         userBId: string;
-        topic: string;
+        topic: string[];
         userADifficulty: string;
         userBDifficulty: string;
     }): Promise<void> {
@@ -283,7 +283,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         sessionId: string,
         userAId: string,
         userBId: string,
-        topic: string,
+        topic: string[],
         userADifficulty: string,
         userBDifficulty: string,
     ): Promise<void> {
@@ -297,7 +297,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         // Step 3: Fetch question from question service
         const questionServiceUrl = this.configService.get<string>('QUESTION_SERVICE_URL') ?? 'http://localhost:3002';
         const difficulty = minDifficulty(userADifficulty, userBDifficulty);
-        const params = new URLSearchParams({ topic, difficulty });
+        const params = new URLSearchParams({ topic: topic.join(','), difficulty });
         if (exclude.length > 0) params.set('exclude', exclude.join(','));
 
         try {
@@ -338,7 +338,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
                 'userBId', session.userBId,
                 'questionId', session.question?.questionId ?? '',
                 'questionTitle', session.question?.title ?? '',
-                'topic', String(session.question?.topic ?? ''),
+                'topic', (session.question?.topic ?? []).join(','),
                 'difficulty', session.question?.difficulty ?? '',
                 'code', session.code,
                 'language', session.language,
@@ -352,7 +352,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
-    private getMockQuestion(topic: string): any {
+    private getMockQuestion(_topic: string[]): any {
         // return {
         //     questionId: 'MOCK-001',
         //     title: `Mock ${topic} Question`,
