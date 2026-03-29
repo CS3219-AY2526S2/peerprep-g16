@@ -43,6 +43,7 @@ function Collaboration() {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [endSessionState, setEndSessionState] = useState<"idle" | "pending" | "declined">("idle");
     const [incomingEndRequest, setIncomingEndRequest] = useState(false);
+    const [partnerOnline, setPartnerOnline] = useState<boolean | null>(null);
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -77,6 +78,14 @@ function Collaboration() {
 
                 connectedSocket.on("disconnect", () => {
                     if (mounted) setConnectionState("Disconnected");
+                });
+
+                connectedSocket.on("partnerDisconnected", () => {
+                    if (mounted) setPartnerOnline(false);
+                });
+
+                connectedSocket.on("partnerReconnected", () => {
+                    if (mounted) setPartnerOnline(true);
                 });
 
                 connectedSocket.on("endSession:request", () => {
@@ -195,6 +204,14 @@ function Collaboration() {
                     {endSessionState === "pending" ? "Waiting for peer…" : endSessionState === "declined" ? "Peer declined" : "End Session"}
                 </button>
             </header>
+
+            {partnerOnline === false && (
+                <div style={styles.partnerDisconnectedBanner}>
+                    <span style={{ fontSize: "14px" }}>
+                        ⚠️ Your partner has disconnected. Session will auto-close if they don't rejoin within 2 minutes.
+                    </span>
+                </div>
+            )}
 
             {incomingEndRequest && (
                 <div style={styles.endRequestBanner}>
@@ -347,6 +364,10 @@ const styles: Record<string, CSSProperties> = {
     rightColumn: { padding: "20px", display: "flex", gap: "16px", overflow: "hidden", height: "100%" },
     whiteboard: { minWidth: 0, height: 1000, transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
     codeSpace: { minWidth: 0, transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
+    partnerDisconnectedBanner: {
+        display: "flex", alignItems: "center", gap: "12px", padding: "10px 28px",
+        background: "#2a2a4e", color: "#f4a261", borderBottom: "1px solid #f4a261",
+    },
     endRequestBanner: {
         display: "flex", alignItems: "center", gap: "12px", padding: "10px 28px",
         background: "#fff3cd", borderBottom: "1px solid #ffc107",
