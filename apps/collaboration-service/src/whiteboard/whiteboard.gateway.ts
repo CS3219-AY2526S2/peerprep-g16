@@ -212,6 +212,14 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         client.to(data.sessionId).emit('code:result', { output: data.output });
     }
 
+    @SubscribeMessage('cursor:update')
+    handleCursorUpdate(
+        @MessageBody() data: { sessionId: string; userId: string; line: number; col: number },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('cursor:update', { userId: data.userId, line: data.line, col: data.col });
+    }
+
     @SubscribeMessage('endSession:request')
     handleEndSessionRequest(
         @MessageBody() data: { sessionId: string },
