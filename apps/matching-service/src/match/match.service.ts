@@ -87,7 +87,7 @@ export class MatchService {
         } else if (isAnyDifficulty) {
             //Match with same topic and any difficulty but ensure that the other user original difficulty is not lower than user difficulty
             match = allUserData.find(u =>
-                u.topic === topic && u.difficulty === "any" && canMatch(currentUserData.originalDifficulty, u.originalDifficulty, difficulty, u.difficulty)
+                (u.topic === topic || u.topic === "Random") && canMatch(currentUserData.originalDifficulty, u.originalDifficulty, difficulty, u.difficulty)
             );
         } else {
             // Priority 1: same topic + same difficulty (always)
@@ -116,6 +116,9 @@ export class MatchService {
 
         await this.client.zrem(QUEUE_KEY, userId);
         await this.client.zrem(QUEUE_KEY, match.userId);
+
+        await this.client.del(`user:${userId}`);
+        await this.client.del(`user:${match.userId}`);
 
         await this.client.hset(`match:${userId}`, [
             "status", "matched",
@@ -236,6 +239,7 @@ export class MatchService {
     async leaveQueue(userId: string) {
         await this.client.zrem(QUEUE_KEY, userId);
         await this.client.del(`user:${userId}`);
+        await this.client.del(`match:${userId}`);
     }
 
     /**
