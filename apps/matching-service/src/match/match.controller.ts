@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param } from '@nestjs/common';
 import { MatchService } from './match.service';
 import { RedisService } from '../redis/redis.service';
 import { SimulateMatchDto } from './dto/simulate-match.dto';
@@ -9,7 +9,25 @@ export class MatchController {
     private readonly matchService: MatchService,
     private readonly redisService: RedisService,
   ) {}
+    @Post()
+    async joinQueue(@Body() body: any) {
+        const { userId, username, topic, difficulty } = body;
+        if (!userId || !username || !topic) {
+            return { message: 'userId, username and topic are required' };
+        }
+        return await this.matchService.joinQueue(userId, username, topic, difficulty);
+    }
 
+    @Get(':userId')
+    async getStatus(@Param('userId') userId: string) {
+        return await this.matchService.getQueueStatus(userId);
+    }
+
+    @Delete(':userId')
+    async leaveQueue(@Param('userId') userId: string) {
+        await this.matchService.leaveQueue(userId);
+        return { message: 'Left queue successfully' };
+    }
   /**
    * POST /api/match/simulate
    *
