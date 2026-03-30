@@ -14,6 +14,8 @@ import {
 } from "../model/repository.js";
 import AttemptModel from "../model/attempt-model.js";
 import UserModel from "../model/user-model.js";
+import { publishPrivilegeChange } from "../services/tokenBlacklistService.js";
+
 
 export async function createUser(req, res) {
   try {
@@ -163,7 +165,7 @@ export async function updateUserPrivilege(req, res) {
   try {
     const { isAdmin } = req.body;
 
-    if (isAdmin !== undefined) {  // isAdmin can have boolean value true or false
+    if (isAdmin !== undefined) {
       const userId = req.params.id;
       if (!isValidObjectId(userId)) {
         return res.status(404).json({ message: `User ${userId} not found` });
@@ -177,8 +179,16 @@ export async function updateUserPrivilege(req, res) {
       if (req.user.id === userId && isAdmin === false) {
         return res.status(403).json({ message: "Admins cannot remove their own admin privilege" });
       }
-      
+
+      const oldIsAdmin = user.isAdmin;  // ✅ NEW: capture old privilege
+
       const updatedUser = await _updateUserPrivilegeById(userId, isAdmin === true);
+
+      // 🔥 NEW: If privilege actually changed, invalidate their session
+      if (oldIsAdmin !== (isAdmin === true)) {
+        await publishPrivilegeChange(userId, oldIsAdmin, isAdmin === true);
+      }
+
       return res.status(200).json({
         message: `Updated privilege for user ${userId}`,
         data: formatUserResponse(updatedUser),
