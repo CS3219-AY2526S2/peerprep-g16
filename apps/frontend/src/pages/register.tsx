@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
-import webStyles from "../components/styles";
+import styles from "../components/styles";
 
 function Register() {
     const [username, setUsername] = useState("");
@@ -158,6 +158,5 @@ function Register() {
         </div>
     );
 }
-const styles = webStyles;
 
 export default Register;

@@ -5,7 +5,7 @@ import UserTable from "../components/userTable";
 import QuestionTable from "../components/questionTable";
 import AddQuestionModal from "../components/addQuestionModal";
 import EditQuestionModal from "../components/editQuestionModale";
-import webStyles from "../components/styles";
+import styles from "../components/styles";
 
 
 function AdminPage() {
@@ -352,7 +352,5 @@ function AdminPage() {
         </div >
     );
 }
-
-const styles = webStyles;
 
 export default AdminPage;

@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-import webStyles from "../components/styles";
+import styles from "../components/styles";
 import api from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
+import MatchmakingOverlay from "../components/matchmakingOverlay";
 
 function Homepage() {
     const navigate = useNavigate();
@@ -12,6 +13,9 @@ function Homepage() {
     const [matchStatus, setMatchStatus] = useState("Searching for a match...");
     const [elapsed, setElapsed] = useState(0);
     const [isTimeout, setIsTimeout] = useState(false);
+    const [topics, setTopics] = useState<string[]>([]);
+    const [topicsLoading, setTopicsLoading] = useState(true);
+
 
     const pollRef = useRef<any>(null);
     const timerRef = useRef<any>(null);
@@ -34,6 +38,21 @@ function Homepage() {
         setMatchStatus("Searching for a match...");
         setIsTimeout(false);
     };
+
+    useEffect(() => {
+        const fetchTopics = async () => {
+            try {
+                const response = await api.get("http://localhost:3002/questions/topics");
+                setTopics(response.data.topics);
+            } catch (err) {
+                console.error("Failed to fetch topics", err);
+            } finally {
+                setTopicsLoading(false);
+            }
+        };
+
+        fetchTopics();
+    }, []);
 
     useEffect(() => {
         if (!isMatchmaking || isTimeout || hasStartedRef.current) return;
@@ -155,13 +174,25 @@ function Homepage() {
                             value={topic}
                             onChange={e => { setTopic(e.target.value); setError(false); }}
                             style={styles.select}
+                            disabled={topicsLoading}
                         >
-                            <option value="">Select...</option>
-                            <option value="Random">Random</option>
-                            <option value="String">String</option>
-                            <option value="Numbers">Numbers</option>
-                            <option value="Assays">Assays</option>
-                            <option value="List">List</option>
+                            {topicsLoading && (
+                                <option>Loading topics...</option>
+                            )}
+
+                            {!topicsLoading && topics.length === 0 && (
+                                <option disabled>Failed to load topics</option> 
+                            )}
+
+                            {!topicsLoading && topics.length > 0 && (
+                                <>
+                                    <option value="">Select...</option>
+                                    <option value="Random">Random</option>
+                                    {topics.map(t => (
+                                        <option key={t} value={t}>{t}</option>
+                                    ))}
+                                </>
+                            )}
                         </select>
                         <p style={styles.important}>* is required</p>
                     </div>
@@ -185,109 +216,23 @@ function Homepage() {
                 </button>
 
                 {isMatchmaking && (
-                    <div style={overlayStyles.overlay}>
-                        <div style={overlayStyles.box}>
-                            {isTimeout ? (
-                                <>
-                                    <h3 style={{ marginBottom: "10px", color: "red" }}>No Match Found</h3>
-                                    <p style={{ fontSize: "14px", color: "#666", marginBottom: "20px" }}>
-                                        Sorry, there are no available matches at the moment. Please try again later.
-                                    </p>
-                                    <button onClick={() => {
-                                        setIsMatchmaking(false);
-                                        setIsTimeout(false);
-                                        setElapsed(0);
-                                    }} style={overlayStyles.acceptButton}>
-                                        OK
-                                    </button>
-                                </>
-                            ) : (
-                                <>
-                                    <div style={overlayStyles.spinner} />
-                                    <h3 style={{ marginBottom: "10px" }}>{matchStatus}</h3>
-                                    <p style={{ fontSize: "16px", color: "#666", marginBottom: "8px" }}>
-                                        Time elapsed: <span style={{ fontWeight: "bold", color: "#333" }}>
-                                            {Math.floor(elapsed / 60).toString().padStart(2, "0")}:
-                                            {(elapsed % 60).toString().padStart(2, "0")}
-                                        </span>
-                                    </p>
-                                    {elapsed < 60 && (  // less than 1 minute
-                                        <p style={{ fontSize: "13px", color: "#999", marginBottom: "20px" }}>
-                                            Topic: <b>{topic}</b>
-                                            {difficulty ? <> | Difficulty: <b>{difficulty}</b></> : <> | Difficulty: <b>Any</b></>}
-                                        </p>
-                                    )}
-                                    {elapsed >= 60 && elapsed < 120 && (  // 1-2 minutes
-                                        <p style={{ fontSize: "13px", color: "#999", marginBottom: "20px" }}>
-                                            Topic: <b>{topic}</b>
-                                            <> | Difficulty: <b>Any</b></>                                        </p>
-                                    )}
-                                    <button onClick={cancelMatchmaking} style={overlayStyles.cancelButton}>
-                                        Cancel
-                                    </button>
-                                </>
-                            )
-                            }
-                        </div>
-                    </div>
+                    <MatchmakingOverlay
+                        isTimeout={isTimeout}
+                        matchStatus={matchStatus}
+                        elapsed={elapsed}
+                        topic={topic}
+                        difficulty={difficulty}
+                        onCancel={cancelMatchmaking}
+                        onDismiss={() => {
+                            setIsMatchmaking(false);
+                            setIsTimeout(false);
+                            setElapsed(0);
+                        }}
+                    />
                 )}
             </div>
         </>
     );
 }
-
-const styles = webStyles;
-
-const overlayStyles: { [key: string]: React.CSSProperties } = {
-    overlay: {
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 1000,
-    },
-    box: {
-        backgroundColor: "white",
-        padding: "40px",
-        borderRadius: "12px",
-        width: "400px",
-        textAlign: "center",
-        boxShadow: "0px 4px 20px rgba(0,0,0,0.2)",
-    },
-    spinner: {
-        width: "50px",
-        height: "50px",
-        border: "5px solid #f0f0f0",
-        borderTop: "5px solid #007BFF",
-        borderRadius: "50%",
-        animation: "spin 1s linear infinite",
-        margin: "0 auto 20px auto",
-    },
-    cancelButton: {
-        padding: "10px 30px",
-        backgroundColor: "white",
-        border: "2px solid red",
-        borderRadius: "20px",
-        color: "red",
-        fontWeight: "bold",
-        fontSize: "15px",
-        cursor: "pointer",
-    },
-    acceptButton: {
-        padding: "10px 30px",
-        backgroundColor: "#007BFF",
-        border: "none",
-        borderRadius: "20px",
-        color: "white",
-        fontWeight: "bold",
-        fontSize: "15px",
-        cursor: "pointer",
-    },
-};
 
 export default Homepage

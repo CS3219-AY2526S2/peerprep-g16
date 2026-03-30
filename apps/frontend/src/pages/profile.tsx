@@ -2,7 +2,7 @@ import React from "react"
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
-import webStyles from "../components/styles";
+import styles from "../components/styles";
 
 function Profile() {
     const stored = localStorage.getItem("login");
@@ -286,8 +286,5 @@ function Profile() {
         </div>
     );
 }
-
-const styles = webStyles
-
 
 export default Profile

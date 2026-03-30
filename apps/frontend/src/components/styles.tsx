@@ -1,4 +1,4 @@
-const webStyles: { [key: string]: React.CSSProperties } = {
+const styles: { [key: string]: React.CSSProperties } = {
     heading: {
         fontSize: "20px",
         color: "#333",
@@ -287,6 +287,56 @@ const webStyles: { [key: string]: React.CSSProperties } = {
         fontSize: "15px",
         cursor: "pointer",
     },
+
+    overlay: {
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        backgroundColor: "rgba(0,0,0,0.5)",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 1000,
+    },
+    box: {
+        backgroundColor: "white",
+        padding: "40px",
+        borderRadius: "12px",
+        width: "400px",
+        textAlign: "center",
+        boxShadow: "0px 4px 20px rgba(0,0,0,0.2)",
+    },
+    spinner: {
+        width: "50px",
+        height: "50px",
+        border: "5px solid #f0f0f0",
+        borderTop: "5px solid #007BFF",
+        borderRadius: "50%",
+        animation: "spin 1s linear infinite",
+        margin: "0 auto 20px auto",
+    },
+    cancelButton: {
+        padding: "10px 30px",
+        backgroundColor: "white",
+        border: "2px solid red",
+        borderRadius: "20px",
+        color: "red",
+        fontWeight: "bold",
+        fontSize: "15px",
+        cursor: "pointer",
+    },
+    acceptButton: {
+        padding: "10px 30px",
+        backgroundColor: "#007BFF",
+        border: "none",
+        borderRadius: "20px",
+        color: "white",
+        fontWeight: "bold",
+        fontSize: "15px",
+        cursor: "pointer",
+    },
 };
 
-export default webStyles;
+export default styles;
