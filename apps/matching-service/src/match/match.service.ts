@@ -73,13 +73,23 @@ export class MatchService {
         ).then(results => results.filter(u => u && u.userId));
 
         const isRandom = topic === "Random" && difficulty === "any";
+        const isRandomTopic = topic === "Random"
+        const isAnyDifficulty = difficulty === "any";
         let match: Record<string, string> | undefined;
 
         if (isRandom) {
-            match = allUserData.find(u => u.topic === "Random" && u.difficulty === "any");
-            if (!match) match = allUserData[0];
+            match = allUserData[0];
+        } else if (isRandomTopic) {
+            //Match with same difficulty and any topic
+            match = allUserData.find(u =>
+                u.difficulty === difficulty && u.topic === "Random"
+            );
+        } else if (isAnyDifficulty) {
+            //Match with same topic and any difficulty but ensure that the other user original difficulty is not lower than user difficulty
+            match = allUserData.find(u =>
+                u.topic === topic && u.difficulty === "any" && canMatch(currentUserData.originalDifficulty, u.originalDifficulty, difficulty, u.difficulty)
+            );
         } else {
-
             // Priority 1: same topic + same difficulty (always)
             match = allUserData.find(u =>
                 u.topic === topic && u.difficulty === difficulty
