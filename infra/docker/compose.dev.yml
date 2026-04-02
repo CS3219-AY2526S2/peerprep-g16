@@ -99,6 +99,14 @@ services:
       - "2358:2358"
     privileged: true
     restart: always
+    environment:
+      - REDIS_URL=redis://judge0-redis:6379
+      - REDIS_HOST=judge0-redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=judge0-db
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0password
     depends_on:
       - judge0-db
       - judge0-redis
@@ -110,6 +118,14 @@ services:
       - ./judge0.conf:/judge0.conf:ro
     privileged: true
     restart: always
+    environment:
+      - REDIS_URL=redis://judge0-redis:6379
+      - REDIS_HOST=judge0-redis
+      - REDIS_PORT=6379
+      - POSTGRES_HOST=judge0-db
+      - POSTGRES_DB=judge0
+      - POSTGRES_USER=judge0
+      - POSTGRES_PASSWORD=judge0password
     depends_on:
       - judge0-db
       - judge0-redis
