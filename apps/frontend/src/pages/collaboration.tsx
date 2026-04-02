@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useParams, Navigate } from "react-router-dom";
-import Whiteboard from "../components/collaboration/Whiteboard";
+import Whiteboard, { type WhiteboardHandle } from "../components/collaboration/Whiteboard";
 import CodeSpace from "../components/collaboration/CodeSpace";
 import HintPanel from "../components/collaboration/HintPanel";
 import VoiceCall from "../components/collaboration/VoiceCall";
@@ -44,6 +44,7 @@ function Collaboration() {
     const [endSessionState, setEndSessionState] = useState<"idle" | "pending" | "declined">("idle");
     const [incomingEndRequest, setIncomingEndRequest] = useState(false);
     const [partnerOnline, setPartnerOnline] = useState<boolean | null>(null);
+    const whiteboardRef = useRef<WhiteboardHandle>(null);
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -143,7 +144,15 @@ function Collaboration() {
         socket.emit("endSession:request", { sessionId: matchingId });
     };
 
-    const handleApproveEnd = () => {
+    const handleApproveEnd = async () => {
+        try {
+            const screenshot = await whiteboardRef.current?.captureScreenshot();
+            if (screenshot) {
+                socket?.emit("whiteboard:screenshot", { sessionId: matchingId, screenshot });
+            }
+        } catch (err) {
+            console.warn("Failed to capture whiteboard screenshot:", err);
+        }
         socket?.emit("endSession:approve", { sessionId: matchingId });
         setIncomingEndRequest(false);
     };
@@ -213,7 +222,7 @@ function Collaboration() {
                 </div>
             )}
 
-            {incomingEndRequest && (
+            {incomingEndRequest && endSessionState !== "pending" && (
                 <div style={styles.endRequestBanner}>
                     <span style={{ fontSize: "14px", color: "#1a1a2e" }}>
                         Your peer wants to end the session.
@@ -282,6 +291,7 @@ function Collaboration() {
                 <div style={styles.rightColumn}>
                     <div style={{ ...styles.whiteboard, flex: codeExpanded ? "1 1 50%" : "1 1 100%" }}>
                         <Whiteboard
+                            ref={whiteboardRef}
                             sessionId={matchingId}
                             userId={userId}
                             socket={socket}

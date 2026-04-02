@@ -236,6 +236,13 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         client.to(data.sessionId).emit('endSession:decline');
     }
 
+    @SubscribeMessage('whiteboard:screenshot')
+    handleWhiteboardScreenshot(
+        @MessageBody() data: { sessionId: string; screenshot: string },
+    ) {
+        this.sessionsService.setWhiteboardScreenshot(data.sessionId, data.screenshot);
+    }
+
     @SubscribeMessage('endSession:approve')
     async handleEndSessionApprove(
         @MessageBody() data: { sessionId: string },

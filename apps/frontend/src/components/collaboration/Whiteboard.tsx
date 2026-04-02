@@ -1,43 +1,59 @@
-import { Excalidraw, reconcileElements } from "@excalidraw/excalidraw";
+import { Excalidraw, exportToBlob, reconcileElements } from "@excalidraw/excalidraw";
 import "@excalidraw/excalidraw/index.css";
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { Socket } from "socket.io-client";
 
-export default function Whiteboard({
-    sessionId,
-    userId,
-    socket,
-}: {
+export interface WhiteboardHandle {
+    captureScreenshot: () => Promise<string>;
+}
+
+const Whiteboard = forwardRef<WhiteboardHandle, {
     sessionId: string;
     userId: string;
     socket: Socket | null;
-}) {
+}>(function Whiteboard({ sessionId, userId, socket }, ref) {
     const excalidrawAPI = useRef<any>(null);
     const throttleTimer = useRef<any>(null);
-    
+
+    useImperativeHandle(ref, () => ({
+        async captureScreenshot(): Promise<string> {
+            const elements = excalidrawAPI.current?.getSceneElements() ?? [];
+            const appState = excalidrawAPI.current?.getAppState?.() ?? {};
+            const files = excalidrawAPI.current?.getFiles?.() ?? {};
+            const blob = await exportToBlob({
+                elements,
+                appState: { ...appState, exportScale: 0.5 },
+                files,
+                mimeType: "image/png",
+                exportPadding: 16,
+            });
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve(reader.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        },
+    }));
 
     useEffect(() => {
         if (!socket) return;
 
         socket.on("whiteboardUpdate", (payload: { elements: any[]; userId: string }) => {
             if (payload.userId === userId) return;
-            
+
             if (!excalidrawAPI.current) {
                 console.warn("No excalidrawAPI available yet");
                 return;
             }
-            
-            // Get current elements and reconcile with incoming
+
             const currentElements = excalidrawAPI.current.getSceneElements() || [];
-            
-            // CRITICAL: Use reconcileElements to properly merge
-            // reconcileElements(sceneElements, remoteElements, appState)
             const reconciled = reconcileElements(
                 currentElements,
                 payload.elements,
                 excalidrawAPI.current.getAppState?.() || {}
             );
-            
+
             excalidrawAPI.current.updateScene({
                 elements: reconciled,
                 commitToHistory: false,
@@ -62,17 +78,15 @@ export default function Whiteboard({
                 excalidrawAPI={(api) => { excalidrawAPI.current = api; }}
                 onChange={(elements) => {
                     if (!socket) return;
-                    
-                    // Throttle updates - only emit once every 50ms
+
                     if (throttleTimer.current) return;
-                    
+
                     throttleTimer.current = setTimeout(() => {
                         throttleTimer.current = null;
                     }, 50);
-                    
-                    // Also save locally so it persists on refresh
+
                     localStorage.setItem(`whiteboard_${sessionId}`, JSON.stringify(elements));
-                    
+
                     socket.emit("whiteboardUpdate", { sessionId, userId, elements });
                 }}
                 initialData={{
@@ -82,4 +96,6 @@ export default function Whiteboard({
             />
         </div>
     );
-}
+});
+
+export default Whiteboard;

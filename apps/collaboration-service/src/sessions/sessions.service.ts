@@ -11,6 +11,7 @@ export interface Session {
     topic: string;
     question: any;
     whiteboardElements: any[];
+    whiteboardScreenshot?: string;
     code: string;
     language: string;
     revealedHints: number;
@@ -263,6 +264,12 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         this.scheduleFlush(sessionId);
     }
 
+    setWhiteboardScreenshot(sessionId: string, screenshot: string): void {
+        const session = this.sessions.get(sessionId);
+        if (!session) return;
+        session.whiteboardScreenshot = screenshot;
+    }
+
     // ─── Redis Streams integration ────────────────────────────────────────────
 
     /**
@@ -350,6 +357,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         try {
             await this.redis.xadd(
                 'session.completed', '*',
+                'sessionId', session.sessionId,
                 'userAId', session.userAId,
                 'userBId', session.userBId,
                 'questionId', session.question?.questionId ?? '',
@@ -361,6 +369,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
                 'hintsUsed', String(session.revealedHints),
                 'testCasesPassed', String(session.testCasesPassed),
                 'duration', String(duration),
+                'whiteboardScreenshot', session.whiteboardScreenshot ?? '',
             );
             this.logger.log(`Published session.completed for ${session.sessionId}`);
         } catch (err: any) {
