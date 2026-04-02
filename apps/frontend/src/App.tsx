@@ -6,6 +6,7 @@ import Register from "./pages/register"
 import Homepage from "./pages/homepage"
 import AdminPage from "./pages/adminPage"
 import Profile from "./pages/profile"
+import Collaboration from './pages/collaboration'
 import api from "./api/axiosInstance";
 
 function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
@@ -166,7 +167,12 @@ function Appcontent() {
                     </ProtectedAdminRoute>
                 } />
                 <Route path="/history"></Route>
-                <Route path="/collaboration"> </Route>
+                <Route path="/collaboration/:sessionId" element={
+                    <ProtectedUserRoute>
+                        <Collaboration/>
+                    </ProtectedUserRoute>
+                }
+                />
                 <Route path="*" element={<Navigate to="/" replace />} /> {/*for unknown URL, it will redirect to login page*/}
             </Routes>
         </div>
@@ -254,8 +260,9 @@ const navbarHomepageStyle = {
     gap: "15px",
     marginLeft: "auto",
     marginRight: "20px",
-    alignItems: "center",
-    boxSizing: "border-box" as const,
+    alignItems: "center",                 // ← add this
+    boxSizing: "border-box" as const,     // ← add this
+    zIndex: 9999
 };
 
 

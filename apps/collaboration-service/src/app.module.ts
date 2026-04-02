@@ -1,10 +1,19 @@
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { SessionsModule } from './sessions/sessions.module';
+import { WhiteboardModule } from './whiteboard/whiteboard.module';
+import { MatchConsumerModule } from './match-consumer/match-consumer.module';
 
 @Module({
-  imports: [],
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    SessionsModule,
+    WhiteboardModule,
+    MatchConsumerModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }
