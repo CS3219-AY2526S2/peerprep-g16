@@ -6,6 +6,7 @@ import {
   getAllUsers,
   getUser,
   getUserAttempts,
+  getUserHistory,
   updateUser,
   updateUserPrivilege,
 } from "../controller/user-controller.js";
@@ -19,6 +20,9 @@ router.get("/", verifyAccessToken, verifyIsAdmin, getAllUsers);
 router.patch("/:id/privilege", verifyAccessToken, verifyIsAdmin, updateUserPrivilege);
 
 router.post("/", createUser);
+
+// Internal route — no auth, used by Collaboration Service to build question exclude list
+router.get("/:id/history", getUserHistory);
 
 router.get("/:id/attempts", verifyAccessToken, verifyIsOwnerOrAdmin, getUserAttempts);
 
