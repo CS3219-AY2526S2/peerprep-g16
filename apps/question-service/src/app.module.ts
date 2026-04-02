@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
 import { QuestionModule } from './question/question.module';
+import { AuthModule } from './auth/auth.module';
 
 /**
  * Root application module.
@@ -14,6 +15,7 @@ import { QuestionModule } from './question/question.module';
       isGlobal: true,
     }),
     MongooseModule.forRoot(process.env.MONGODB_URI || ''),
+    AuthModule,
     QuestionModule,
   ],
 })

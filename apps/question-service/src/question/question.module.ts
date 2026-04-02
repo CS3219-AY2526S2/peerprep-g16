@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { AdminGuard } from '../auth/admin.guard';
 import { Question, QuestionSchema } from './schemas/question.schema';
 import { QuestionController } from './question.controller';
 import { QuestionService } from './question.service';
@@ -18,9 +17,6 @@ import { HttpModule } from '@nestjs/axios';
     ]),
   ],
   controllers: [QuestionController],
-  providers: [
-    QuestionService, 
-    AdminGuard, 
-  ],
+  providers: [QuestionService],
 })
 export class QuestionModule {}
