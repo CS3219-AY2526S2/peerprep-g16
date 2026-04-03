@@ -9,6 +9,7 @@ const DIFFICULTY_RANK = {
     easy: 1,
     medium: 2,
     hard: 3,
+    Random: 0
 };
 
 @Injectable()
@@ -39,7 +40,7 @@ export class MatchService {
 
         //Ensure that all selections are filled
         const cleanTopic = topic || 'Random';
-        const cleanDifficulty = difficulty || 'any';
+        const cleanDifficulty = difficulty || 'Random';
         const timestamp = Date.now();
 
         //store the user details
@@ -72,19 +73,20 @@ export class MatchService {
             otherUsers.map(id => this.client.hgetall(`user:${id}`))
         ).then(results => results.filter(u => u && u.userId));
 
-        const isRandom = topic === "Random" && difficulty === "any";
+        const isRandom = topic === "Random" && difficulty === "Random";
         const isRandomTopic = topic === "Random"
-        const isAnyDifficulty = difficulty === "any";
+        const isRandomDifficulty = difficulty === "Random";
         let match: Record<string, string> | undefined;
 
         if (isRandom) {
-            match = allUserData[0];
+            match = allUserData.find(u =>
+                canMatch(currentUserData.originalDifficulty, u.originalDifficulty, difficulty, u.difficulty)
+            );
         } else if (isRandomTopic) {
             //Match with same difficulty and any topic
             match = allUserData.find(u =>
-                u.difficulty === difficulty && u.topic === "Random"
-            );
-        } else if (isAnyDifficulty) {
+                u.difficulty === difficulty);
+        } else if (isRandomDifficulty) {
             //Match with same topic and any difficulty but ensure that the other user original difficulty is not lower than user difficulty
             match = allUserData.find(u =>
                 (u.topic === topic || u.topic === "Random") && canMatch(currentUserData.originalDifficulty, u.originalDifficulty, difficulty, u.difficulty)
@@ -96,7 +98,7 @@ export class MatchService {
             );
             // Priority 2: same topic + other user is "any" difficulty but will check to make sure that other user original difficulty is not lower than user difficulty
             if (!match) match = allUserData.find(u =>
-                u.topic === topic && u.difficulty === "any" && canMatch(currentUserData.originalDifficulty, u.originalDifficulty, difficulty, u.difficulty)
+                u.topic === topic && u.difficulty === "Random" && canMatch(currentUserData.originalDifficulty, u.originalDifficulty, difficulty, u.difficulty)
             );
 
             // Priority 3: random topic + same difficulty
@@ -105,7 +107,7 @@ export class MatchService {
             );
             // Priority 4: fully random user
             if (!match) match = allUserData.find(u =>
-                u.topic === "Random" && u.difficulty === "any"
+                u.topic === "Random" && u.difficulty === "Random"
             );
 
         }
@@ -192,25 +194,27 @@ export class MatchService {
         const elapsed = Date.now() - parseInt(userData.joinedAt);
 
         if (elapsed >= STAGE2_TIMEOUT) {
+            await this.client.zrem(QUEUE_KEY, userId);
+            await this.client.del(`user:${userId}`);
             return { status: 'timeout', message: 'No match found. Please try again later.', elapsed };
         }
 
         if (elapsed >= STAGE1_TIMEOUT) {
-            const match = await this.findMatch(userId, userData.username, userData.topic, 'any');
+            const match = await this.findMatch(userId, userData.username, userData.topic, 'Random');
             if (match.status === 'matched') {
                 await this.client.del(`match:${userId}`);
                 await this.client.del(`user:${userId}`);
                 return match;
             }
             await this.client.hset(`user:${userId}`, [
-                'difficulty', 'any'
+                'difficulty', 'Random'
             ]);
 
             return {
                 status: 'expand_search_difficulty',
                 message: 'Still no match found. Expanding to any difficulty...',
                 elapsed,
-                preferences: { topic: userData.topic, difficulty: 'any' }
+                preferences: { topic: userData.topic, difficulty: 'Random' }
             };
 
         }
@@ -307,16 +311,15 @@ export class MatchService {
 }
 
 function canMatch(originalSearchDiff: string, originalTargetDiff: string, searchDiff: string, targetDiff: string): boolean {
-    if (originalSearchDiff == 'any' || originalTargetDiff == 'any') return true
-    if (searchDiff == 'any' && targetDiff == 'any') return true
+    if (originalSearchDiff === 'Random' || originalTargetDiff === 'Random') return true
+    if (searchDiff === 'Random' && targetDiff === 'Random') return true
 
     const searchRank = DIFFICULTY_RANK[searchDiff];
     const targetRank = DIFFICULTY_RANK[targetDiff];
     const originalSearchRank = DIFFICULTY_RANK[originalSearchDiff];
     const originalTargetRank = DIFFICULTY_RANK[originalTargetDiff];
 
-    if (searchDiff === 'any' && originalTargetRank <= originalSearchRank) return true;
-    if (targetDiff === 'any' && originalSearchRank <= originalTargetRank) return true;
-
+    if (searchDiff === 'Random' && targetDiff !== 'Random') return originalTargetRank <= originalSearchRank;
+    if (targetDiff === 'Random' && searchDiff !== 'Random') return originalSearchRank <= originalTargetRank;
     return searchRank >= targetRank;
 }
