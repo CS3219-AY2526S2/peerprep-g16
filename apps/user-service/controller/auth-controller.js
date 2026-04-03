@@ -7,6 +7,7 @@ import {
   updateRefreshToken,
 } from "../model/repository.js";
 import { formatUserResponse } from "./user-controller.js";
+import { isTokenBlacklisted } from "../services/tokenBlacklistService.js";
 
 export async function handleLogin(req, res) {
   const { email, password } = req.body;
@@ -66,6 +67,14 @@ export async function handleRefreshToken(req, res) {
 
     if (!user || user.refreshToken !== refreshToken) {
       return res.status(401).json({ message: "Invalid refresh token" });
+    }
+
+    const blacklisted = await isTokenBlacklisted(user.id, payload.iat);
+    if (blacklisted) {
+      return res.status(401).json({
+        message: "Session invalidated due to privilege change. Please log in again.",
+        code: "PRIVILEGE_CHANGED",
+      });
     }
 
     const accessToken = jwt.sign(
