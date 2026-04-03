@@ -61,11 +61,11 @@ services:
       PORT: 3001
       ENV: DEV
       DB_LOCAL_URI: mongodb://\${MONGO_USERNAME}:\${MONGO_PASSWORD}@mongodb:27017/peerprepUserServiceDB?authSource=admin
-      DB_CLOUD_URI: \${DB_CLOUD_URI}
+      DB_CLOUD_URI: ${DB_CLOUD_URI}
       JWT_SECRET: \${JWT_SECRET}
       JWT_REFRESH_SECRET: \${JWT_REFRESH_SECRET}
-      ENCRYPTION_KEY: \${ENCRYPTION_KEY}
-      ENCRYPTION_IV: \${ENCRYPTION_IV}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      ENCRYPTION_IV: ${ENCRYPTION_IV}
       ADMIN_EMAIL: admin@example.com
       REDIS_HOST: redis
       REDIS_PORT: 6379
