@@ -40,6 +40,7 @@ function Homepage() {
         setIsTimeout(false);
     };
 
+    //get topics from the database for the dropdown menu
     useEffect(() => {
         const fetchTopics = async () => {
             try {
@@ -55,6 +56,47 @@ function Homepage() {
         fetchTopics();
     }, []);
 
+    // Check on page load if user is already in queue
+    useEffect(() => {
+        const stored = localStorage.getItem("login");
+        const user = stored ? JSON.parse(stored) : null;
+        if (!user) return;
+
+        const checkExistingQueue = async () => {
+            try {
+                const response = await api.get(`http://localhost:3004/api/match/${user.id}`);
+
+                if (response.data.status === 'matched') {
+                    // Already matched before they refreshed
+                    handleMatchFound(response.data);
+                } else if (response.data.status === 'waiting' ||
+                    response.data.status === 'expand_search_difficulty') {
+                    // Still in queue — restore the overlay
+                    const userData = response.data.preferences;
+                    if (userData?.topic) setTopic(userData.topic);
+                    if (userData?.difficulty) setDifficulty(userData.difficulty);
+                    setIsMatchmaking(true);
+                    setMatchStatus(response.data.message || "Searching for a match...");
+                    hasStartedRef.current = true; // prevent useEffect re-joining
+                    startPolling(user.id);
+                    // Restore elapsed time if available
+                    if (response.data.elapsed) {
+                        setElapsed(Math.floor(response.data.elapsed / 1000));
+                        timerRef.current = setInterval(() => {
+                            setElapsed(prev => prev + 1);
+                        }, 1000);
+                    }
+                }
+                // status === 'not_in_queue' → do nothing, normal page load
+            } catch (err) {
+                console.error('Failed to check queue status on mount', err);
+            }
+        };
+
+        checkExistingQueue();
+    }, []);
+
+    //matchmaking 
     useEffect(() => {
         if (!isMatchmaking || isTimeout || hasStartedRef.current) return;
         hasStartedRef.current = true;

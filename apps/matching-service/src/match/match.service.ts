@@ -196,7 +196,11 @@ export class MatchService {
         if (elapsed >= STAGE2_TIMEOUT) {
             await this.client.zrem(QUEUE_KEY, userId);
             await this.client.del(`user:${userId}`);
-            return { status: 'timeout', message: 'No match found. Please try again later.', elapsed };
+            return {
+                status: 'timeout',
+                message: 'No match found. Please try again later.',
+                elapsed
+            };
         }
 
         if (elapsed >= STAGE1_TIMEOUT) {
