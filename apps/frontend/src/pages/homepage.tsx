@@ -30,8 +30,24 @@ function Homepage() {
         timerRef.current = null;
     };
 
-    const handleMatchmake = () => {
+    const handleMatchmake = async () => {
         if (!topic) { setError(true); return; }
+
+        try {
+            await api.get("http://localhost:3001/auth/verify-token");
+        } catch {
+            return; // interceptor handles PRIVILEGE_CHANGED
+        }
+
+        const stored = localStorage.getItem("login");
+        const user = stored ? JSON.parse(stored) : null;
+        if (user?.isAdmin) {
+            window.alert("Your account privilege has changed. Please log in again.");
+            localStorage.removeItem("login");
+            navigate("/");
+            return;
+        }
+
         hasStartedRef.current = false;
         isMatchedRef.current = false;
         setIsMatchmaking(true);
