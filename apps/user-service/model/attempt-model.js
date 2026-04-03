@@ -17,7 +17,8 @@ const AttemptModelSchema = new Schema(
       type: String,
     },
     topic: {
-      type: String,
+      type: [String],
+      default: [],
     },
     difficulty: {
       type: String,
@@ -29,6 +30,20 @@ const AttemptModelSchema = new Schema(
     partnerId: {
       type: Schema.Types.ObjectId,
       ref: "UserModel",
+    },
+    language: {
+      type: String,
+    },
+    hintsUsed: {
+      type: Number,
+      default: 0,
+    },
+    testCasesPassed: {
+      type: Number,
+      default: 0,
+    },
+    duration: {
+      type: Number, // milliseconds
     },
     attemptedAt: {
       type: Date,
