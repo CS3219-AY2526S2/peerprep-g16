@@ -2,6 +2,7 @@ import React from "react"
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
+import styles from "../components/styles";
 
 function Profile() {
     const stored = localStorage.getItem("login");
@@ -285,108 +286,5 @@ function Profile() {
         </div>
     );
 }
-
-const styles = {
-
-    heading: {
-        fontSize: "20px",
-        color: "#333",
-        textAlign: "left" as const,
-        padding: 0,
-        margin: "20px 0 20px 20px"
-    },
-
-    input: {
-        marginBottom: "5px",
-        borderRadius: "10px",
-        width: "250px",
-        padding: "12px",
-        border: "1px solid #ccc",
-        outline: "none",
-        boxSizing: "border-box" as const,
-        flexShrink: 0 as const,
-    },
-
-    label: {
-        display: "flex" as const,
-        alignItems: "center" as const,
-        gap: "20px",
-        marginBottom: "30px",
-        fontSize: "16px",
-        whiteSpace: "nowrap" as const,
-        width: "100%",
-        justifyContent: "flex-start" as const,
-    },
-
-    passwordBorder: {
-        backgroundColor: "#f5f5f5",
-        border: "1px solid #ddd",
-        borderRadius: "4px",
-        padding: "12px",
-        margin: "10px 0",
-        fontSize: "14px",
-        color: "#666",
-        textAlign: "left" as const,
-        width: "460px",
-        marginBottom: "30px"
-    },
-
-    passwordRequirements: {
-        margin: "5px 0",
-        paddingLeft: "20px",
-    },
-
-    button: {
-        padding: "10px 20px",
-        backgroundColor: "white",
-        border: "2px solid #333",
-        borderRadius: "20px",
-        fontWeight: "bold" as const,
-        fontSize: "15px",
-        cursor: "pointer",
-        alignSelf: "flex-start"
-    },
-
-    link: {
-        textDecoration: "none",
-        color: "#007BFF",
-    },
-
-    sidebar: {
-        width: "200px",
-        minHeight: "100vh",    // change from height: "auto"
-        borderRight: "1px solid #000000",
-        textAlign: "left" as const,
-        left: 0,
-        padding: 0,
-    },
-
-    tab: {
-        display: "block" as const,
-        width: "100%",
-        padding: "15px 20px",
-        textAlign: "left" as const,
-        border: "none",
-        backgroundColor: "transparent",
-        cursor: "pointer",
-        fontSize: "15px",
-        left: 0,
-    },
-
-    activeTab: {
-        display: "block" as const,
-        width: "100%",
-        padding: "15px 20px",
-        textAlign: "left" as const,
-        border: "none",
-        cursor: "pointer",
-        fontSize: "15px",
-        backgroundColor: "#ffffff",
-        fontWeight: "bold",
-    }
-
-
-};
-
 
 export default Profile

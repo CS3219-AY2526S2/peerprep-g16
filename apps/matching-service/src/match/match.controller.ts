@@ -1,7 +1,6 @@
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param } from '@nestjs/common';
 import { MatchService } from './match.service';
 import { RedisService } from '../redis/redis.service';
-import { SimulateMatchDto } from './dto/simulate-match.dto';
 
 @Controller('api/match')
 export class MatchController {
@@ -9,44 +8,25 @@ export class MatchController {
     private readonly matchService: MatchService,
     private readonly redisService: RedisService,
   ) {}
-
-  /**
-   * POST /api/match/simulate
-   *
-   * TEMPORARY test endpoint - simulates a match being found.
-   * Your teammate's matching algorithm will call
-   * matchService.publishMatchFound() directly.
-   */
-  @Post('simulate')
-  async simulateMatch(@Body() body: SimulateMatchDto) {
-    const { userAId, userBId, topic, userADifficulty, userBDifficulty } = body;
-
-    if (
-      !userAId ||
-      !userBId ||
-      !topic ||
-      !userADifficulty ||
-      !userBDifficulty
-    ) {
-      return {
-        error:
-          'Missing required fields: userAId, userBId, topic, userADifficulty, userBDifficulty',
-      };
+    @Post()
+    async joinQueue(@Body() body: any) {
+        const { userId, username, topic, difficulty } = body;
+        if (!userId || !username || !topic) {
+            return { message: 'userId, username and topic are required' };
+        }
+        return await this.matchService.joinQueue(userId, username, topic, difficulty);
     }
 
-    const result = await this.matchService.publishMatchFound(
-      userAId,
-      userBId,
-      topic,
-      userADifficulty,
-      userBDifficulty,
-    );
+    @Get(':userId')
+    async getStatus(@Param('userId') userId: string) {
+        return await this.matchService.getQueueStatus(userId);
+    }
 
-    return {
-      message: 'Match found and event published!',
-      data: result,
-    };
-  }
+    @Delete(':userId')
+    async leaveQueue(@Param('userId') userId: string) {
+        await this.matchService.leaveQueue(userId);
+        return { message: 'Left queue successfully' };
+    }
 
   /**
    * GET /api/match/health
