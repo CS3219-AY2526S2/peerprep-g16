@@ -142,11 +142,8 @@ export class QuestionService {
     const uniqueExcludeIds = Array.from(new Set(attemptedQuestionIds));
 
     // Step 1: try to find unattempted questions first
-    const primaryFilter: Record<string, any> = {
-      topic,
-      difficulty,
-    };
-
+    const primaryFilter: Record<string, any> = { topic };
+    if (difficulty) primaryFilter.difficulty = difficulty;
     if (uniqueExcludeIds.length > 0) {
       primaryFilter.questionId = { $nin: uniqueExcludeIds };
     }
@@ -158,10 +155,8 @@ export class QuestionService {
     }
 
     // Step 2: fallback — allow previously attempted questions
-    const fallbackFilter = {
-      topic,
-      difficulty,
-    };
+    const fallbackFilter: Record<string, any> = { topic };
+    if (difficulty) fallbackFilter.difficulty = difficulty;
 
     const fallbackQuestions = await this.questionModel
       .find(fallbackFilter)

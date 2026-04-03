@@ -24,8 +24,13 @@ const FLUSH_DELAY_MS = 5000;
 const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 
 const DIFFICULTY_RANK: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
-function minDifficulty(a: string, b: string): string {
-    return (DIFFICULTY_RANK[a] ?? 0) <= (DIFFICULTY_RANK[b] ?? 0) ? a : b;
+function resolveDifficulty(a: string | null, b: string | null): string | undefined {
+    const aValid = a && a in DIFFICULTY_RANK;
+    const bValid = b && b in DIFFICULTY_RANK;
+    if (aValid && bValid) return DIFFICULTY_RANK[a!] <= DIFFICULTY_RANK[b!] ? a! : b!;
+    if (aValid) return a!;
+    if (bValid) return b!;
+    return undefined;
 }
 
 @Injectable()
@@ -117,8 +122,8 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         userBId: string;
         matchId: string;
         topic: string;
-        userADifficulty: string;
-        userBDifficulty: string;
+        userADifficulty: string | null;
+        userBDifficulty: string | null;
     }): Promise<Session> {
         const session: Session = {
             sessionId: data.matchId,
@@ -284,8 +289,8 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         userAId: string,
         userBId: string,
         topic: string,
-        userADifficulty: string,
-        userBDifficulty: string,
+        userADifficulty: string | null,
+        userBDifficulty: string | null,
     ): Promise<void> {
         // Step 2: Fetch both users' attempted question IDs (best-effort; failure → empty exclude list)
         const [historyA, historyB] = await Promise.all([
@@ -296,7 +301,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
         // Step 3: Fetch question from question service
         const questionServiceUrl = this.configService.get<string>('QUESTION_SERVICE_URL') ?? 'http://localhost:3002';
-        const difficulty = minDifficulty(userADifficulty, userBDifficulty);
+        const difficulty = resolveDifficulty(userADifficulty, userBDifficulty);
 
         try {
             const res = await fetch(`${questionServiceUrl}/questions/select`, {

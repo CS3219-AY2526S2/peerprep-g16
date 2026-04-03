@@ -6,9 +6,10 @@ export class SelectQuestionDto {
     @IsString()
     topic: string;
 
+    @IsOptional()
     @IsString()
     @IsIn(['Easy', 'Medium', 'Hard'])
-    difficulty: string;
+    difficulty?: string;
 
     @IsOptional()
     @IsArray()
