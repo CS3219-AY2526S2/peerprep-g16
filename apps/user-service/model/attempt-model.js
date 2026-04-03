@@ -45,6 +45,10 @@ const AttemptModelSchema = new Schema(
     duration: {
       type: Number, // milliseconds
     },
+    whiteboardScreenshot: {
+      type: Buffer,
+      contentType: String,
+    },
     attemptedAt: {
       type: Date,
       default: Date.now,

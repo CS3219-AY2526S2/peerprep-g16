@@ -25,6 +25,7 @@ async function saveAttempts(event) {
     hintsUsed,
     testCasesPassed,
     duration,
+    whiteboardScreenshot,
   } = event;
 
   const sessionId = event.sessionId ?? "";
@@ -49,6 +50,9 @@ async function saveAttempts(event) {
         hintsUsed: Number(hintsUsed) || 0,
         testCasesPassed: Number(testCasesPassed) || 0,
         duration: Number(duration) || 0,
+        whiteboardScreenshot: whiteboardScreenshot
+          ? Buffer.from(whiteboardScreenshot.replace(/^data:image\/\w+;base64,/, ""), "base64")
+          : undefined,
       }),
     ),
   );

@@ -114,10 +114,75 @@ services:
       NODE_ENV: production
       PORT: 3003
       REDIS_URL: redis://redis:6379
-      # ⚠️ Teammate: add your env vars here
+      JWT_SECRET: ${JWT_SECRET}
+      QUESTION_SERVICE_URL: http://question-service:3002
+      USER_SERVICE_URL: http://user-service:3001
+      JUDGE0_URL: http://judge0-server:2358
     depends_on:
-      mongodb:
+      redis:
         condition: service_healthy
+    networks:
+      - peerprep-network
+
+  # ============================================
+  # Judge0 (Code Execution) — Port 2358
+  # ============================================
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    volumes:
+      - ./infra/docker/judge0.conf:/judge0.conf:ro
+    ports:
+      - "2358:2358"
+    privileged: true
+    restart: always
+    environment:
+      REDIS_URL: redis://judge0-redis:6379
+      REDIS_HOST: judge0-redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: judge0-db
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - peerprep-network
+
+  judge0-workers:
+    image: judge0/judge0:1.13.1
+    command: ["./scripts/workers"]
+    volumes:
+      - ./infra/docker/judge0.conf:/judge0.conf:ro
+    privileged: true
+    restart: always
+    environment:
+      REDIS_URL: redis://judge0-redis:6379
+      REDIS_HOST: judge0-redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: judge0-db
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - peerprep-network
+
+  judge0-db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
+    volumes:
+      - judge0-db-data:/var/lib/postgresql/data
+    networks:
+      - peerprep-network
+
+  judge0-redis:
+    image: redis:6.0
     networks:
       - peerprep-network
 
@@ -160,6 +225,7 @@ services:
 volumes:
   mongodb_data:
   redis_data:
+  judge0-db-data:
 
 networks:
   peerprep-network:
