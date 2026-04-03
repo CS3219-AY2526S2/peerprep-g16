@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
 import { findUserById as _findUserById } from "../model/repository.js";
+import { isTokenBlacklisted } from "../services/tokenBlacklistService.js";
+import { decrypt } from "../utils/encryption.js"; // ✅ import the decrypt util
 
 export function verifyAccessToken(req, res, next) {
   const authHeader = req.headers["authorization"];
@@ -7,21 +9,42 @@ export function verifyAccessToken(req, res, next) {
     return res.status(401).json({ message: "Authentication failed" });
   }
 
-  // request auth header: `Authorization: Bearer + <access_token>`
+  // Authorization: Bearer <access_token>
   const token = authHeader.split(" ")[1];
-  jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
+  if (!token) {
+    return res.status(401).json({ message: "Authentication failed" });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, async (err, decoded) => {
     if (err) {
       return res.status(401).json({ message: "Authentication failed" });
     }
 
-    // load latest user info from DB
-    const dbUser = await _findUserById(user.id);
-    if (!dbUser) {
-      return res.status(401).json({ message: "Authentication failed" });
-    }
+    try {
+      const blacklisted = await isTokenBlacklisted(decoded.id, decoded.iat);
+      if (blacklisted) {
+        return res.status(401).json({
+          message: "Session invalidated due to privilege change. Please log in again.",
+          code: "PRIVILEGE_CHANGED",
+        });
+      }
 
-    req.user = { id: dbUser.id, username: dbUser.username, email: dbUser.email, isAdmin: dbUser.isAdmin };
-    next();
+      const dbUser = await _findUserById(decoded.id);
+      if (!dbUser) {
+        return res.status(401).json({ message: "Authentication failed" });
+      }
+
+      req.user = {
+        id: dbUser.id,
+        username: dbUser.username,
+        email: decrypt(dbUser.email),
+        isAdmin: dbUser.isAdmin,
+      };
+      next();
+    } catch (error) {
+      console.error("Error in token verification:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
   });
 }
 

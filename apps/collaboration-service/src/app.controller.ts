@@ -38,17 +38,15 @@ export class AppController {
         const languageId = LANGUAGE_IDS[language];
         if (!languageId) throw new BadRequestException(`Unsupported language: ${language}`);
 
-        const apiKey = this.configService.get<string>('JUDGE0_API_KEY');
-        if (!apiKey) throw new InternalServerErrorException('JUDGE0_API_KEY is not configured');
+        const judge0Url = this.configService.get<string>('JUDGE0_URL');
+        if (!judge0Url) throw new InternalServerErrorException('JUDGE0_URL is not configured');
 
         const response = await fetch(
-            'https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=false&wait=true',
+            `${judge0Url}/submissions?base64_encoded=false&wait=true`,
             {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-RapidAPI-Key': apiKey,
-                    'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
                 },
                 body: JSON.stringify({
                     source_code: code,

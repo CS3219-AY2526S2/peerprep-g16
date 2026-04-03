@@ -7,6 +7,11 @@
   padding-top: 2rem;
 }
 
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
 body, html {
     margin: 0;
     padding: 0;

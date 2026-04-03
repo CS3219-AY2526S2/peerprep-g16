@@ -8,6 +8,7 @@ import AdminPage from "./pages/adminPage"
 import Profile from "./pages/profile"
 import Collaboration from './pages/collaboration'
 import api from "./api/axiosInstance";
+import webStyles from './components/styles'
 
 function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("login");
@@ -52,7 +53,14 @@ function Appcontent() {
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [showPrivilegeModal, setShowPrivilegeModal] = useState(false);
     const navigate = useNavigate();
+
+    React.useEffect(() => {
+        const handler = () => setShowPrivilegeModal(true);
+        window.addEventListener("privilegeChanged", handler);
+        return () => window.removeEventListener("privilegeChanged", handler);
+    }, []);
 
     React.useEffect(() => {
         if (location.pathname === "/") {
@@ -106,6 +114,16 @@ function Appcontent() {
 
     return (
         <div style={{ overflow: "hidden" }}>
+            {showPrivilegeModal && (
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modalBox}>
+                        <p style={{ marginBottom: "16px" }}>Your account privilege has changed. Please log in again.</p>
+                        <button style={styles.button} onClick={() => { setShowPrivilegeModal(false); navigate("/"); }}>
+                            OK
+                        </button>
+                    </div>
+                </div>
+            )}
             {isLoginOrRegister ? <DefaultNavbar /> : isAdmin ? <AdminPageNavbar /> : <HomepageNavbar />}
             <Routes>
                 <Route path="/" element={
@@ -344,6 +362,23 @@ const styles = {
     link: {
         textDecoration: "none",
         color: "#007BFF",
+    },
+    modalOverlay: {
+        position: "fixed" as const,
+        inset: 0,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 99999,
+    },
+    modalBox: {
+        background: "#fff",
+        borderRadius: "12px",
+        padding: "32px",
+        textAlign: "center" as const,
+        boxShadow: "0 4px 24px rgba(0,0,0,0.2)",
+        maxWidth: "340px",
     },
 };
 

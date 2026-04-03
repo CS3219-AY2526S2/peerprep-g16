@@ -57,7 +57,12 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
     }
 
     handleDisconnect(client: Socket) {
-        console.log(`Client disconnected: ${client.id}`);
+        const { sessionId, userId } = client.data ?? {};
+        console.log(`Client disconnected: ${client.id}${sessionId ? ` (session ${sessionId})` : ''}`);
+        if (sessionId) {
+            client.to(sessionId).emit('partnerDisconnected', { userId });
+            this.sessionsService.onUserLeft(sessionId, this.server);
+        }
     }
 
     @SubscribeMessage('joinSession')
@@ -79,7 +84,13 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         }
 
         client.join(data.sessionId);
+        client.data.sessionId = data.sessionId;
+        client.data.userId = user.id;
         console.log(`User ${user.id} joined session ${data.sessionId}`);
+
+        this.sessionsService.onUserJoined(data.sessionId);
+        client.to(data.sessionId).emit('partnerReconnected', { userId: user.id });
+
         client.emit('whiteboardState', { elements: session.whiteboardElements });
         client.emit('codeState', { code: session.code, language: session.language });
         client.emit('hintState', { revealedCount: session.revealedHints });
@@ -201,6 +212,14 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         client.to(data.sessionId).emit('code:result', { output: data.output });
     }
 
+    @SubscribeMessage('cursor:update')
+    handleCursorUpdate(
+        @MessageBody() data: { sessionId: string; userId: string; line: number; col: number },
+        @ConnectedSocket() client: Socket,
+    ) {
+        client.to(data.sessionId).emit('cursor:update', { userId: data.userId, line: data.line, col: data.col });
+    }
+
     @SubscribeMessage('endSession:request')
     handleEndSessionRequest(
         @MessageBody() data: { sessionId: string },
@@ -215,6 +234,13 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @ConnectedSocket() client: Socket,
     ) {
         client.to(data.sessionId).emit('endSession:decline');
+    }
+
+    @SubscribeMessage('whiteboard:screenshot')
+    handleWhiteboardScreenshot(
+        @MessageBody() data: { sessionId: string; screenshot: string },
+    ) {
+        this.sessionsService.setWhiteboardScreenshot(data.sessionId, data.screenshot);
     }
 
     @SubscribeMessage('endSession:approve')
