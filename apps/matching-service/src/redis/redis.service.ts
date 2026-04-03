@@ -12,9 +12,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);
 
   async onModuleInit(): Promise<void> {
-    this.client = new Redis({
-      host: process.env.REDIS_HOST || '127.0.0.1',
-      port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    this.client = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', {
       retryStrategy(times) {
         if (times > 10) return null;
         return Math.min(times * 500, 3000);
