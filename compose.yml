@@ -92,11 +92,16 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
+      MONGODB_URI: ${QUESTION_SERVICE_MONGODB_URI}
+      REDIS_URL: redis://redis:6379
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       JWT_SECRET: ${JWT_SECRET}
       USER_SERVICE_URL: http://user-service:3001
-      JUDGE0_URL: http://judge0-server:2358
     depends_on:
       mongodb:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - peerprep-network
