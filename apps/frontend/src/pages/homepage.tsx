@@ -3,6 +3,7 @@ import styles from "../components/styles";
 import api from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import MatchmakingOverlay from "../components/matchmakingOverlay";
+import TopicSelectionOverlay from "../components/topicSelectionOverlay";
 
 function Homepage() {
     const navigate = useNavigate();
@@ -168,7 +169,7 @@ function Homepage() {
                 <div style={styles.filtersRow}>
                     <div style={styles.filterGroup}>
                         <label style={styles.filterLabel}>
-                            Topic: <span style={{ color: "red" }}>*</span>
+                            Topic: <span style={styles.important}>*</span>
                         </label>
                         <select
                             value={topic}
@@ -181,7 +182,7 @@ function Homepage() {
                             )}
 
                             {!topicsLoading && topics.length === 0 && (
-                                <option disabled>Failed to load topics</option> 
+                                <option disabled>Failed to load topics</option>
                             )}
 
                             {!topicsLoading && topics.length > 0 && (
@@ -194,7 +195,7 @@ function Homepage() {
                                 </>
                             )}
                         </select>
-                        <p style={styles.important}>* is required</p>
+                        <p style={styles.important}>Note: <span style={styles.normalText}>Topic is required and if difficulty is not selected, it will be set as random.</span> </p>
                     </div>
 
                     <div style={styles.filterGroup}>
@@ -228,6 +229,13 @@ function Homepage() {
                             setIsTimeout(false);
                             setElapsed(0);
                         }}
+                    />
+                )}
+
+                {error && (
+                    <TopicSelectionOverlay
+                        selected={error}
+                        onDismiss={() => setError(false)}
                     />
                 )}
             </div>

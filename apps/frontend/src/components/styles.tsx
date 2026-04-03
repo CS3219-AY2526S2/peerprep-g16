@@ -237,6 +237,14 @@ const styles: { [key: string]: React.CSSProperties } = {
 
     },
 
+    normalText: {
+        fontSize: "16px",
+        color: "black",
+        marginTop: "0",
+        textAlign: "left" as const,
+
+    },
+
     page: {
         marginTop: "80px",
         padding: "30px 40px",
