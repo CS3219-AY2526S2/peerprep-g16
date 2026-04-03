@@ -14,8 +14,8 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: \${MONGO_USERNAME}
-      MONGO_INITDB_ROOT_PASSWORD: \${MONGO_PASSWORD}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
     volumes:
       - mongodb_data:/data/db
     networks:
@@ -60,7 +60,7 @@ services:
     environment:
       PORT: 3001
       ENV: DEV
-      DB_LOCAL_URI: mongodb://\${MONGO_USERNAME}:\${MONGO_PASSWORD}@mongodb:27017/peerprepUserServiceDB?authSource=admin
+      DB_LOCAL_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/peerprepUserServiceDB?authSource=admin
       DB_CLOUD_URI: ${DB_CLOUD_URI}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
