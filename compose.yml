@@ -49,7 +49,7 @@ services:
   # ============================================
   # User Service (Express.js) — Port 3001
   # ============================================
-   user-service:
+  user-service:
     build:
       context: ./apps/user-service
       dockerfile: Dockerfile
