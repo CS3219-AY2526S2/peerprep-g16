@@ -11,6 +11,7 @@ export interface Session {
     topic: string;
     question: any;
     whiteboardElements: any[];
+    whiteboardScreenshot?: string;
     code: string;
     language: string;
     revealedHints: number;
@@ -22,6 +23,7 @@ export interface Session {
 const REDIS_PREFIX = 'collab:session:';
 const FLUSH_DELAY_MS = 5000;
 const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
+const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
 const DIFFICULTY_RANK: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
 function resolveDifficulty(a: string | null, b: string | null): string | undefined {
@@ -41,6 +43,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     private redis: Redis;
     private flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private questionTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+    private idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
     constructor(private readonly configService: ConfigService) {
         const redisUrl = this.configService.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
@@ -60,6 +63,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
     async onModuleDestroy() {
         for (const timer of this.questionTimeouts.values()) clearTimeout(timer);
+        for (const timer of this.idleTimers.values()) clearTimeout(timer);
         for (const [sessionId, timer] of this.flushTimers) {
             clearTimeout(timer);
             await this.flushToRedis(sessionId);
@@ -207,6 +211,13 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             this.questionTimeouts.delete(sessionId);
         }
 
+        // Cancel idle disconnect timer
+        const idleTimer = this.idleTimers.get(sessionId);
+        if (idleTimer) {
+            clearTimeout(idleTimer);
+            this.idleTimers.delete(sessionId);
+        }
+
         // Cancel any pending flush and do a final immediate write, then clean up
         const timer = this.flushTimers.get(sessionId);
         if (timer) {
@@ -258,6 +269,12 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         this.scheduleFlush(sessionId);
     }
 
+    setWhiteboardScreenshot(sessionId: string, screenshot: string): void {
+        const session = this.sessions.get(sessionId);
+        if (!session) return;
+        session.whiteboardScreenshot = screenshot;
+    }
+
     // ─── Redis Streams integration ────────────────────────────────────────────
 
     /**
@@ -269,8 +286,8 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         userAId: string;
         userBId: string;
         topic: string;
-        userADifficulty: string;
-        userBDifficulty: string;
+        userADifficulty: string | null;
+        userBDifficulty: string | null;
     }): Promise<void> {
         await this.create(data);
         // Fetch question async — timeout fallback in create() handles the case where this is slow
@@ -345,6 +362,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         try {
             await this.redis.xadd(
                 'session.completed', '*',
+                'sessionId', session.sessionId,
                 'userAId', session.userAId,
                 'userBId', session.userBId,
                 'questionId', session.question?.questionId ?? '',
@@ -356,11 +374,50 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
                 'hintsUsed', String(session.revealedHints),
                 'testCasesPassed', String(session.testCasesPassed),
                 'duration', String(duration),
+                'whiteboardScreenshot', session.whiteboardScreenshot ?? '',
             );
             this.logger.log(`Published session.completed for ${session.sessionId}`);
         } catch (err: any) {
             this.logger.warn(`Failed to publish session.completed: ${err.message}`);
         }
+    }
+
+    // ─── Disconnect / reconnect handling ─────────────────────────────────────
+
+    /**
+     * Called when a user joins a session room. Cancels any pending idle timer.
+     */
+    onUserJoined(sessionId: string): void {
+        const timer = this.idleTimers.get(sessionId);
+        if (timer) {
+            clearTimeout(timer);
+            this.idleTimers.delete(sessionId);
+            this.logger.log(`Idle timer cancelled — user rejoined session ${sessionId}`);
+        }
+    }
+
+    /**
+     * Called when a user disconnects. Checks if the room is now empty and, if so,
+     * starts a 2-minute idle timer that auto-terminates the session.
+     */
+    onUserLeft(sessionId: string, io: Server): void {
+        const session = this.sessions.get(sessionId);
+        if (!session || session.status === 'ended') return;
+
+        // Count remaining sockets in the room
+        const room = io.sockets.adapter.rooms.get(sessionId);
+        const remaining = room ? room.size : 0;
+
+        if (remaining > 0) return; // partner is still connected
+
+        this.logger.log(`All users left session ${sessionId} — starting ${IDLE_TIMEOUT_MS / 1000}s idle timer`);
+        const timer = setTimeout(async () => {
+            this.idleTimers.delete(sessionId);
+            this.logger.log(`Idle timeout reached — auto-terminating session ${sessionId}`);
+            await this.endSession(sessionId);
+            io.to(sessionId).emit('endSession:confirmed');
+        }, IDLE_TIMEOUT_MS);
+        this.idleTimers.set(sessionId, timer);
     }
 
     private getMockQuestion(_topic: string): any {

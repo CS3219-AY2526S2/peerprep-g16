@@ -87,6 +87,7 @@ export default function CodeSpace({
     const [isRunning, setIsRunning] = useState(false);
     const [peerRunning, setPeerRunning] = useState(false);
     const [runOutput, setRunOutput] = useState<RunOutput | null>(null);
+    const [partnerCursor, setPartnerCursor] = useState<{ line: number; col: number } | null>(null);
     const hasServerCode = useRef(false);
 
     // Auto-generate boilerplate when question loads, but only if no code was saved server-side
@@ -115,6 +116,10 @@ export default function CodeSpace({
             if (payload.language) setLanguage(payload.language);
         });
 
+        socket.on("cursor:update", (payload: { userId: string; line: number; col: number }) => {
+            if (payload.userId !== userId) setPartnerCursor({ line: payload.line, col: payload.col });
+        });
+
         socket.on("code:run", () => {
             setPeerRunning(true);
             setRunOutput(null);
@@ -130,15 +135,25 @@ export default function CodeSpace({
         return () => {
             socket.off("codeState");
             socket.off("codeUpdate");
+            socket.off("cursor:update");
             socket.off("code:run");
             socket.off("code:result");
         };
     }, [socket, userId, sessionId]);
 
+    const emitCursor = (target: HTMLTextAreaElement, currentCode: string) => {
+        const pos = target.selectionStart;
+        const lines = currentCode.substring(0, pos).split("\n");
+        const line = lines.length;
+        const col = lines[lines.length - 1].length + 1;
+        socket?.emit("cursor:update", { sessionId, userId, line, col });
+    };
+
     const handleCodeChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newCode = e.target.value;
         setCode(newCode);
         socket?.emit("codeUpdate", { sessionId, userId, code: newCode, language });
+        emitCursor(e.target, newCode);
     };
 
     const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -236,6 +251,11 @@ export default function CodeSpace({
                     <option value="java">Java</option>
                     <option value="cpp">C++</option>
                 </select>
+                {partnerCursor && (
+                    <span style={styles.cursorBadge} title="Partner's cursor position">
+                        Partner: Ln {partnerCursor.line}, Col {partnerCursor.col}
+                    </span>
+                )}
                 <button onClick={handleRun} disabled={busy} style={{ ...styles.runBtn, opacity: busy ? 0.6 : 1, cursor: busy ? "not-allowed" : "pointer" }}>
                     {busy ? (
                         <><span style={styles.spinner} /> {runLabel}</>
@@ -250,6 +270,7 @@ export default function CodeSpace({
                     value={code}
                     onChange={handleCodeChange}
                     onKeyDown={handleTabKey}
+                    onSelect={(e) => emitCursor(e.target as HTMLTextAreaElement, code)}
                     spellCheck={false}
                     style={styles.textarea}
                 />
@@ -366,6 +387,11 @@ const styles: Record<string, CSSProperties> = {
         borderRadius: "50%", animation: "spin 0.6s linear infinite",
     },
     closeBtn: { background: "none", border: "none", color: "#a9b1d6", cursor: "pointer", fontSize: "16px", padding: "0 4px" },
+    cursorBadge: {
+        fontSize: "11px", color: "#f4a261", background: "#f4a26118",
+        border: "1px solid #f4a26144", borderRadius: "6px", padding: "2px 8px",
+        fontFamily: "monospace", whiteSpace: "nowrap" as const,
+    },
     editorWrap: {
         flex: 1, borderRadius: "10px", overflow: "hidden",
         border: "1px solid #2a2a4e", background: "#0d1117",

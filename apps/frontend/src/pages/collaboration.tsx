@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useParams, Navigate } from "react-router-dom";
-import Whiteboard from "../components/collaboration/Whiteboard";
+import Whiteboard, { type WhiteboardHandle } from "../components/collaboration/Whiteboard";
 import CodeSpace from "../components/collaboration/CodeSpace";
 import HintPanel from "../components/collaboration/HintPanel";
 import VoiceCall from "../components/collaboration/VoiceCall";
@@ -43,6 +43,8 @@ function Collaboration() {
     const [socket, setSocket] = useState<Socket | null>(null);
     const [endSessionState, setEndSessionState] = useState<"idle" | "pending" | "declined">("idle");
     const [incomingEndRequest, setIncomingEndRequest] = useState(false);
+    const [partnerOnline, setPartnerOnline] = useState<boolean | null>(null);
+    const whiteboardRef = useRef<WhiteboardHandle>(null);
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -77,6 +79,14 @@ function Collaboration() {
 
                 connectedSocket.on("disconnect", () => {
                     if (mounted) setConnectionState("Disconnected");
+                });
+
+                connectedSocket.on("partnerDisconnected", () => {
+                    if (mounted) setPartnerOnline(false);
+                });
+
+                connectedSocket.on("partnerReconnected", () => {
+                    if (mounted) setPartnerOnline(true);
                 });
 
                 connectedSocket.on("endSession:request", () => {
@@ -134,7 +144,15 @@ function Collaboration() {
         socket.emit("endSession:request", { sessionId: matchingId });
     };
 
-    const handleApproveEnd = () => {
+    const handleApproveEnd = async () => {
+        try {
+            const screenshot = await whiteboardRef.current?.captureScreenshot();
+            if (screenshot) {
+                socket?.emit("whiteboard:screenshot", { sessionId: matchingId, screenshot });
+            }
+        } catch (err) {
+            console.warn("Failed to capture whiteboard screenshot:", err);
+        }
         socket?.emit("endSession:approve", { sessionId: matchingId });
         setIncomingEndRequest(false);
     };
@@ -196,7 +214,15 @@ function Collaboration() {
                 </button>
             </header>
 
-            {incomingEndRequest && (
+            {partnerOnline === false && (
+                <div style={styles.partnerDisconnectedBanner}>
+                    <span style={{ fontSize: "14px" }}>
+                        ⚠️ Your partner has disconnected. Session will auto-close if they don't rejoin within 2 minutes.
+                    </span>
+                </div>
+            )}
+
+            {incomingEndRequest && endSessionState !== "pending" && (
                 <div style={styles.endRequestBanner}>
                     <span style={{ fontSize: "14px", color: "#1a1a2e" }}>
                         Your peer wants to end the session.
@@ -265,6 +291,7 @@ function Collaboration() {
                 <div style={styles.rightColumn}>
                     <div style={{ ...styles.whiteboard, flex: codeExpanded ? "1 1 50%" : "1 1 100%" }}>
                         <Whiteboard
+                            ref={whiteboardRef}
                             sessionId={matchingId}
                             userId={userId}
                             socket={socket}
@@ -347,6 +374,10 @@ const styles: Record<string, CSSProperties> = {
     rightColumn: { padding: "20px", display: "flex", gap: "16px", overflow: "hidden", height: "100%" },
     whiteboard: { minWidth: 0, height: 1000, transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
     codeSpace: { minWidth: 0, transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
+    partnerDisconnectedBanner: {
+        display: "flex", alignItems: "center", gap: "12px", padding: "10px 28px",
+        background: "#2a2a4e", color: "#f4a261", borderBottom: "1px solid #f4a261",
+    },
     endRequestBanner: {
         display: "flex", alignItems: "center", gap: "12px", padding: "10px 28px",
         background: "#fff3cd", borderBottom: "1px solid #ffc107",

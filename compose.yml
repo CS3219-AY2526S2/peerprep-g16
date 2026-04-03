@@ -1,0 +1,232 @@
+# compose.yml
+# PeerPrep - Docker Compose
+# Usage: docker compose up --build
+
+services:
+
+  # ============================================
+  # MongoDB
+  # ============================================
+  mongodb:
+    image: mongo:7
+    container_name: peerprep-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: \${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: \${MONGO_PASSWORD}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - peerprep-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ============================================
+  # Redis
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: peerprep-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - peerprep-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ============================================
+  # User Service (Express.js) — Port 3001
+  # ============================================
+  user-service:
+    build:
+      context: ./apps/user-service
+      dockerfile: Dockerfile
+    container_name: peerprep-user-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      ENV: DEV
+      DB_LOCAL_URI: mongodb://\${MONGO_USERNAME}:\${MONGO_PASSWORD}@mongodb:27017/peerprepUserServiceDB?authSource=admin
+      DB_CLOUD_URI: \${DB_CLOUD_URI}
+      JWT_SECRET: \${JWT_SECRET}
+      JWT_REFRESH_SECRET: \${JWT_REFRESH_SECRET}
+      ENCRYPTION_KEY: \${ENCRYPTION_KEY}
+      ENCRYPTION_IV: \${ENCRYPTION_IV}
+      ADMIN_EMAIL: admin@example.com
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - peerprep-network
+
+  # ============================================
+  # Question Service (TypeScript) — Port 3002
+  # ============================================
+  question-service:
+    build:
+      context: ./apps/question-service
+      dockerfile: Dockerfile
+    container_name: peerprep-question-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      # ⚠️ Teammate: add your env vars here
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - peerprep-network
+
+  # ============================================
+  # Collaboration Service (TypeScript) — Port 3003
+  # ============================================
+  collaboration-service:
+    build:
+      context: ./apps/collaboration-service
+      dockerfile: Dockerfile
+    container_name: peerprep-collaboration-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    environment:
+      NODE_ENV: production
+      PORT: 3003
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      QUESTION_SERVICE_URL: http://question-service:3002
+      USER_SERVICE_URL: http://user-service:3001
+      JUDGE0_URL: http://judge0-server:2358
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - peerprep-network
+
+  # ============================================
+  # Judge0 (Code Execution) — Port 2358
+  # ============================================
+  judge0-server:
+    image: judge0/judge0:1.13.1
+    volumes:
+      - ./infra/docker/judge0.conf:/judge0.conf:ro
+    ports:
+      - "2358:2358"
+    privileged: true
+    restart: always
+    environment:
+      REDIS_URL: redis://judge0-redis:6379
+      REDIS_HOST: judge0-redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: judge0-db
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - peerprep-network
+
+  judge0-workers:
+    image: judge0/judge0:1.13.1
+    command: ["./scripts/workers"]
+    volumes:
+      - ./infra/docker/judge0.conf:/judge0.conf:ro
+    privileged: true
+    restart: always
+    environment:
+      REDIS_URL: redis://judge0-redis:6379
+      REDIS_HOST: judge0-redis
+      REDIS_PORT: 6379
+      POSTGRES_HOST: judge0-db
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
+    depends_on:
+      - judge0-db
+      - judge0-redis
+    networks:
+      - peerprep-network
+
+  judge0-db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
+    volumes:
+      - judge0-db-data:/var/lib/postgresql/data
+    networks:
+      - peerprep-network
+
+  judge0-redis:
+    image: redis:6.0
+    networks:
+      - peerprep-network
+
+  # ============================================
+  # Matching Service (TypeScript) — Port 3004
+  # ============================================
+  matching-service:
+    build:
+      context: ./apps/matching-service
+      dockerfile: Dockerfile
+    container_name: peerprep-matching-service
+    restart: unless-stopped
+    ports:
+      - "3004:3004"
+    environment:
+      NODE_ENV: production
+      PORT: 3004
+      REDIS_URL: redis://redis:6379
+      # ⚠️ Teammate: add your env vars here
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - peerprep-network
+
+  # ============================================
+  # Frontend (React/Vite) — Port 5173
+  # ============================================
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    container_name: peerprep-frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    networks:
+      - peerprep-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+  judge0-db-data:
+
+networks:
+  peerprep-network:
+    driver: bridge

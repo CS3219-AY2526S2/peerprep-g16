@@ -18,3 +18,6 @@ Thumbs.db
 
 # coverage
 coverage/
+
+# Judge0 config (contains credentials)
+infra/docker/judge0.conf
