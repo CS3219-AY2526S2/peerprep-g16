@@ -14,8 +14,8 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_ROOT_USERNAME: \${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: \${MONGO_PASSWORD}
     volumes:
       - mongodb_data:/data/db
     networks:
@@ -49,7 +49,7 @@ services:
   # ============================================
   # User Service (Express.js) — Port 3001
   # ============================================
-  user-service:
+   user-service:
     build:
       context: ./apps/user-service
       dockerfile: Dockerfile
@@ -60,12 +60,12 @@ services:
     environment:
       PORT: 3001
       ENV: DEV
-      DB_LOCAL_URI: mongodb://admin:password123@mongodb:27017/peerprepUserServiceDB?authSource=admin
-      DB_CLOUD_URI: mongodb://peerprep-admin:Peerprep2526@ac-ycam9om-shard-00-00.6x2xogl.mongodb.net:27017,ac-ycam9om-shard-00-01.6x2xogl.mongodb.net:27017,ac-ycam9om-shard-00-02.6x2xogl.mongodb.net:27017/peerprepUserService?ssl=true&replicaSet=atlas-prkdof-shard-0&authSource=admin&appName=peerprep-g16
-      JWT_SECRET: peerprep-group16-secret-change-this-later
-      JWT_REFRESH_SECRET: peerprep-group16-secret-change-this-later-123
-      ENCRYPTION_KEY: 039bc11590d23ff311bb9b635de73b9eab6b3163be86f600f4ef07db8dba0d68
-      ENCRYPTION_IV: 9ea2efa7a529165a6d5fbd311d2cb518
+      DB_LOCAL_URI: mongodb://\${MONGO_USERNAME}:\${MONGO_PASSWORD}@mongodb:27017/peerprepUserServiceDB?authSource=admin
+      DB_CLOUD_URI: \${DB_CLOUD_URI}
+      JWT_SECRET: \${JWT_SECRET}
+      JWT_REFRESH_SECRET: \${JWT_REFRESH_SECRET}
+      ENCRYPTION_KEY: \${ENCRYPTION_KEY}
+      ENCRYPTION_IV: \${ENCRYPTION_IV}
       ADMIN_EMAIL: admin@example.com
       REDIS_HOST: redis
       REDIS_PORT: 6379
