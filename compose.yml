@@ -140,9 +140,9 @@ services:
       REDIS_HOST: judge0-redis
       REDIS_PORT: 6379
       POSTGRES_HOST: judge0-db
-      POSTGRES_DB: judge0
-      POSTGRES_USER: judge0
-      POSTGRES_PASSWORD: judge0password
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
     depends_on:
       - judge0-db
       - judge0-redis
@@ -161,9 +161,9 @@ services:
       REDIS_HOST: judge0-redis
       REDIS_PORT: 6379
       POSTGRES_HOST: judge0-db
-      POSTGRES_DB: judge0
-      POSTGRES_USER: judge0
-      POSTGRES_PASSWORD: judge0password
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
     depends_on:
       - judge0-db
       - judge0-redis
@@ -173,9 +173,9 @@ services:
   judge0-db:
     image: postgres:13
     environment:
-      POSTGRES_DB: judge0
-      POSTGRES_USER: judge0
-      POSTGRES_PASSWORD: judge0password
+      POSTGRES_DB: ${JUDGE0_POSTGRES_DB}
+      POSTGRES_USER: ${JUDGE0_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JUDGE0_POSTGRES_PASSWORD}
     volumes:
       - judge0-db-data:/var/lib/postgresql/data
     networks:
