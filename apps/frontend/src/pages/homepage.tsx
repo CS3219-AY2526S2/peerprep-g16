@@ -1,20 +1,205 @@
-import React from "react";
+import React, { useEffect, useState, useRef } from "react";
+import styles from "../components/styles";
+import api from "../api/axiosInstance";
+import { useNavigate } from "react-router-dom";
+import MatchmakingOverlay from "../components/matchmakingOverlay";
+import TopicSelectionOverlay from "../components/topicSelectionOverlay";
 
 function Homepage() {
-    const stored = localStorage.getItem("login");
-    const [topic, setTopic] = React.useState("");
-    const [difficulty, setDifficulty] = React.useState("");
-    const [language, setLanguage] = React.useState("");
-    const [error, setError] = React.useState(false);
+    const navigate = useNavigate();
+    const [topic, setTopic] = useState("");
+    const [difficulty, setDifficulty] = useState("");
+    const [error, setError] = useState(false);
+    const [isMatchmaking, setIsMatchmaking] = useState(false);
+    const [matchStatus, setMatchStatus] = useState("Searching for a match...");
+    const [elapsed, setElapsed] = useState(0);
+    const [isTimeout, setIsTimeout] = useState(false);
+    const [topics, setTopics] = useState<string[]>([]);
+    const [topicsLoading, setTopicsLoading] = useState(true);
+
+
+    const pollRef = useRef<any>(null);
+    const timerRef = useRef<any>(null);
+    const hasStartedRef = useRef(false);
+    const isMatchedRef = useRef(false);
+
+    const stopAll = () => {
+        clearInterval(pollRef.current);
+        clearInterval(timerRef.current);
+        pollRef.current = null;
+        timerRef.current = null;
+    };
 
     const handleMatchmake = () => {
-        if (!topic) {
-            setError(true);
-            return;
+        if (!topic) { setError(true); return; }
+        hasStartedRef.current = false;
+        isMatchedRef.current = false;
+        setIsMatchmaking(true);
+        setElapsed(0);
+        setMatchStatus("Searching for a match...");
+        setIsTimeout(false);
+    };
+
+    //get topics from the database for the dropdown menu
+    useEffect(() => {
+        const fetchTopics = async () => {
+            try {
+                const response = await api.get("http://localhost:3002/questions/topics");
+                setTopics(response.data.topics);
+            } catch (err) {
+                console.error("Failed to fetch topics", err);
+            } finally {
+                setTopicsLoading(false);
+            }
+        };
+
+        fetchTopics();
+    }, []);
+
+    // Check on page load if user is already in queue
+    useEffect(() => {
+        const stored = localStorage.getItem("login");
+        const user = stored ? JSON.parse(stored) : null;
+        if (!user) return;
+
+        const checkExistingQueue = async () => {
+            try {
+                const response = await api.get(`http://localhost:3004/api/match/${user.id}`);
+
+                if (response.data.status === 'matched') {
+                    // Already matched before they refreshed
+                    handleMatchFound(response.data);
+                } else if (response.data.status === 'waiting' ||
+                    response.data.status === 'expand_search_difficulty') {
+                    // Still in queue — restore the overlay
+                    const userData = response.data.preferences;
+                    if (userData?.topic) setTopic(userData.topic);
+                    if (userData?.difficulty) setDifficulty(userData.difficulty);
+                    setIsMatchmaking(true);
+                    setMatchStatus(response.data.message || "Searching for a match...");
+                    hasStartedRef.current = true; // prevent useEffect re-joining
+                    startPolling(user.id);
+                    // Restore elapsed time if available
+                    if (response.data.elapsed) {
+                        setElapsed(Math.floor(response.data.elapsed / 1000));
+                        timerRef.current = setInterval(() => {
+                            setElapsed(prev => prev + 1);
+                        }, 1000);
+                    }
+                }
+                // status === 'not_in_queue' → do nothing, normal page load
+            } catch (err) {
+                console.error('Failed to check queue status on mount', err);
+            }
+        };
+
+        checkExistingQueue();
+    }, []);
+
+    //matchmaking 
+    useEffect(() => {
+        if (!isMatchmaking || isTimeout || hasStartedRef.current) return;
+        hasStartedRef.current = true;
+
+        const stored = localStorage.getItem("login");
+        const user = stored ? JSON.parse(stored) : null;
+        if (!user) return;
+
+        timerRef.current = setInterval(() => {
+            setElapsed(prev => prev + 1);
+        }, 1000);
+
+        const start = async () => {
+            try {
+                const response = await api.post("http://localhost:3004/api/match", {
+                    userId: user.id,
+                    username: user.username,
+                    topic,
+                    difficulty: difficulty.toLowerCase(),
+                });
+
+                if (response.data.status === 'already_in_queue' ||
+                    response.data.status === 'waiting') {
+                    startPolling(user.id);
+                    return;
+                }
+
+                if (response.data.status === 'already_matched') {
+                    const statusResponse = await api.get(`http://localhost:3004/api/match/${user.id}`);
+                    if (statusResponse.data.status === 'matched') {
+                        handleMatchFound(statusResponse.data);
+                        return;
+                    }
+                    startPolling(user.id);
+                    return;
+                }
+
+            } catch (err) {
+                console.error(err);
+                stopAll();
+                setIsMatchmaking(false);
+            }
+        };
+
+        start();
+
+        return () => stopAll();
+    }, [isMatchmaking]);
+
+    const handleMatchFound = (data: any) => {
+        if (isMatchedRef.current) return; // prevent double-firing
+        isMatchedRef.current = true;
+        stopAll();
+        setMatchStatus("Match found! Redirecting...");
+        setTimeout(() => {
+            setIsMatchmaking(false);
+            navigate(`/collaboration/${data.roomId}`);
+        }, 1500);
+    };
+
+    const cancelMatchmaking = async () => {
+        stopAll();
+        hasStartedRef.current = false;
+        isMatchedRef.current = false;
+        setIsMatchmaking(false);
+        setElapsed(0);
+        setIsTimeout(false);
+
+        const stored = localStorage.getItem("login");
+        const user = stored ? JSON.parse(stored) : null;
+        if (user) {
+            try {
+                await api.delete(`http://localhost:3004/api/match/${user.id}`);
+            } catch (err) {
+                console.error(err);
+            }
         }
-        setError(false);
-        // matchmaking logic here
-        console.log("Matchmaking with:", { topic, difficulty, language });
+    };
+
+    const startPolling = (userId: string) => {
+        pollRef.current = setInterval(async () => {
+            if (isMatchedRef.current) {
+                clearInterval(pollRef.current);
+                return;
+            }
+            try {
+                const statusResponse = await api.get(`http://localhost:3004/api/match/${userId}`);
+
+                if (statusResponse.data.status === "matched") {
+                    handleMatchFound(statusResponse.data);
+                } else if (statusResponse.data.status === "expand_search_difficulty") {
+                    setMatchStatus(statusResponse.data.message);
+                } else if (statusResponse.data.status === "timeout") {
+                    stopAll();
+                    setMatchStatus("No match found. Please try again later.");
+                    setIsTimeout(true);
+                } else if (statusResponse.data.status === "waiting") {
+                    setMatchStatus(statusResponse.data.message);
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }, 1000);
     };
 
     return (
@@ -26,20 +211,33 @@ function Homepage() {
                 <div style={styles.filtersRow}>
                     <div style={styles.filterGroup}>
                         <label style={styles.filterLabel}>
-                            Topic: <span style={{ color: "red" }}>*</span>
+                            Topic: <span style={styles.important}>*</span>
                         </label>
                         <select
                             value={topic}
                             onChange={e => { setTopic(e.target.value); setError(false); }}
                             style={styles.select}
+                            disabled={topicsLoading}
                         >
-                            <option value="">Select...</option>
-                            <option value="String">String</option>
-                            <option value="Numbers">Numbers</option>
-                            <option value="Assays">Assays</option>
-                            <option value="List">List</option>
+                            {topicsLoading && (
+                                <option>Loading topics...</option>
+                            )}
+
+                            {!topicsLoading && topics.length === 0 && (
+                                <option disabled>Failed to load topics</option>
+                            )}
+
+                            {!topicsLoading && topics.length > 0 && (
+                                <>
+                                    <option value="">Select...</option>
+                                    <option value="Random">Random</option>
+                                    {topics.map(t => (
+                                        <option key={t} value={t}>{t}</option>
+                                    ))}
+                                </>
+                            )}
                         </select>
-                        <p style={styles.important}>* is required</p>
+                        <p style={styles.important}>Note: <span style={styles.normalText}>Topic is required and if difficulty is not selected, it will be set as random.</span> </p>
                     </div>
 
                     <div style={styles.filterGroup}>
@@ -53,135 +251,38 @@ function Homepage() {
                             <option value="Easy">Easy</option>
                             <option value="Medium">Medium</option>
                             <option value="Hard">Hard</option>
-                        </select>
-                    </div>
-
-                    <div style={styles.filterGroup}>
-                        <label style={styles.filterLabel}>Preferred Coding Language:</label>
-                        <select
-                            value={language}
-                            onChange={e => setLanguage(e.target.value)}
-                            style={styles.select}
-                        >
-                            <option value="">Select...</option>
-                            <option value="Python">Python</option>
-                            <option value="Java">Java</option>
-                            <option value="JavaScript">JavaScript</option>
-                            <option value="C++">C++</option>
-                        </select>
-                    </div>
+                        </select>                    </div>
                 </div>
 
                 <button onClick={handleMatchmake} style={styles.matchmakeButton}>
                     Matchmake
                 </button>
+
+                {isMatchmaking && (
+                    <MatchmakingOverlay
+                        isTimeout={isTimeout}
+                        matchStatus={matchStatus}
+                        elapsed={elapsed}
+                        topic={topic}
+                        difficulty={difficulty}
+                        onCancel={cancelMatchmaking}
+                        onDismiss={() => {
+                            setIsMatchmaking(false);
+                            setIsTimeout(false);
+                            setElapsed(0);
+                        }}
+                    />
+                )}
+
+                {error && (
+                    <TopicSelectionOverlay
+                        selected={error}
+                        onDismiss={() => setError(false)}
+                    />
+                )}
             </div>
         </>
     );
 }
-
-const styles = {
-    container: {
-        marginTop: "100px",
-        textAlign: "center" as const,
-        maxWidth: "280px",
-        marginLeft: "auto",
-        marginRight: "auto",
-    },
-    heading: {
-        fontSize: "24px",
-        color: "#333",
-        margin: "20px 0 20px 20px"
-    },
-
-    important: {
-        fontSize: "16px",
-        color: "red",
-        marginTop: "0",
-        textAlign: "left" as const,
-
-    },
-    input: {
-        marginBottom: "5px",
-        borderRadius: "10px",
-        width: "250px",
-        padding: "12px",
-    },
-    label: {
-        marginBottom: "5px",
-        textAlign: "left" as const,
-        display: "block",
-        width: "250px",
-    },
-    form: {
-        maxWidth: "300px",
-        margin: "0 auto",
-    },
-
-    button: {
-        width: "auto",
-        padding: "10px",
-        backgroundColor: "#007BFF",
-        color: "white",
-        border: "none",
-        cursor: "pointer",
-        marginBottom: "10px",
-    },
-    link: {
-        textDecoration: "none",
-        color: "#007BFF",
-    },
-    page: {
-        marginTop: "80px",
-        padding: "30px 40px",
-    },
-
-    sectionTitle: {
-        fontSize: "18px",
-        fontWeight: "bold" as const,
-        marginBottom: "20px",
-        marginLeft: "20px",
-        marginRight: "20px",
-        align: "Left",
-    },
-    filtersRow: {
-        display: "flex",
-        gap: "40px",
-        alignItems: "flex-start",
-        marginBottom: "30px",
-        justifyContent: "space-between",
-    },
-    filterGroup: {
-        display: "flex",
-        flexDirection: "column" as const,
-        gap: "8px",
-        flex: 1,
-    },
-    filterLabel: {
-        fontSize: "16px",
-        fontWeight: "bold" as const,
-        textAlign: "left" as const,
-        display: "block" as const,
-    },
-    select: {
-        padding: "12px 16px",
-        borderRadius: "10px",
-        border: "1px solid #ccc",
-        fontSize: "15px",
-        width: "100%",
-        backgroundColor: "white",
-        cursor: "pointer",
-    },
-    matchmakeButton: {
-        padding: "10px 20px",
-        backgroundColor: "white",
-        border: "2px solid #333",
-        borderRadius: "20px",
-        fontWeight: "bold" as const,
-        fontSize: "15px",
-        cursor: "pointer",
-    },
-
-};
 
 export default Homepage

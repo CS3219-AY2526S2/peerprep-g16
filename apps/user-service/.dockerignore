@@ -1,0 +1,16 @@
+node_modules
+.env
+.env.*
+.git
+.gitignore
+README.md
+MongoDBSetup.md
+GuideAssets
+.DS_Store
+coverage
+*.test.js
+*.spec.js
+__tests__
+Dockerfile
+.prettierrc
+eslint.config.mjs

@@ -8,6 +8,7 @@ import AdminPage from "./pages/adminPage"
 import Profile from "./pages/profile"
 import Collaboration from './pages/collaboration'
 import api from "./api/axiosInstance";
+import webStyles from './components/styles'
 
 function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("login");
