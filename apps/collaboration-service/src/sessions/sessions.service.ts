@@ -26,13 +26,13 @@ const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
 const DIFFICULTY_RANK: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
-function resolveDifficulty(a: string | null, b: string | null): string {
+function resolveDifficulty(a: string | null, b: string | null): string | undefined {
     const aValid = a && a in DIFFICULTY_RANK;
     const bValid = b && b in DIFFICULTY_RANK;
     if (aValid && bValid) return DIFFICULTY_RANK[a!] <= DIFFICULTY_RANK[b!] ? a! : b!;
     if (aValid) return a!;
     if (bValid) return b!;
-    return 'Random';
+    return undefined;
 }
 
 @Injectable()
