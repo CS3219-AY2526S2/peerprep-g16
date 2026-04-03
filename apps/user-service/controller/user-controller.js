@@ -228,6 +228,21 @@ export async function deleteUser(req, res) {
   }
 }
 
+// Internal endpoint (no auth) — used by Collaboration Service to build question exclude list
+export async function getUserHistory(req, res) {
+  try {
+    const userId = req.params.id;
+    if (!isValidObjectId(userId)) {
+      return res.status(200).json([]);
+    }
+    const questionIds = await AttemptModel.find({ userId }).distinct("questionId");
+    return res.status(200).json(questionIds.map((qid) => ({ questionId: qid })));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "Unknown error when getting user history!" });
+  }
+}
+
 export async function getUserAttempts(req, res) {
   try {
     const userId = req.params.id;
