@@ -59,7 +59,7 @@ services:
       - "3001:3001"
     environment:
       PORT: 3001
-      ENV: DEV
+      ENV: PROD
       DB_LOCAL_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/peerprepUserServiceDB?authSource=admin
       DB_CLOUD_URI: ${DB_CLOUD_URI}
       JWT_SECRET: ${JWT_SECRET}
