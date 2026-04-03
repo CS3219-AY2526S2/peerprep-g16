@@ -92,7 +92,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3002
-      # ⚠️ Teammate: add your env vars here
+      JWT_SECRET: ${JWT_SECRET}
+      USER_SERVICE_URL: http://user-service:3001
+      JUDGE0_URL: http://judge0-server:2358
     depends_on:
       mongodb:
         condition: service_healthy
