@@ -77,3 +77,43 @@ export async function updateRefreshToken(userId, refreshToken) {
     { new: true }
   );
 }
+
+// to increment failed login attempts
+export async function incrementFailedLoginAttempts(userId) {
+  return UserModel.findByIdAndUpdate(
+    userId,
+    {
+      $inc: { failedLoginAttempts: 1 }, // \$inc adds 1 to the current value
+    },
+    { new: true } // return the updated user so we can check the new count
+  );
+}
+
+// to lock the account for 15 minutes
+export async function lockUserAccount(userId) {
+  const lockUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 mins from now
+  return UserModel.findByIdAndUpdate(
+    userId,
+    {
+      $set: {
+        lockUntil: lockUntil,
+        failedLoginAttempts: 0, // reset the counter after locking
+      },
+    },
+    { new: true }
+  );
+}
+
+// to reset failed attempts on successful login
+export async function resetFailedLoginAttempts(userId) {
+  return UserModel.findByIdAndUpdate(
+    userId,
+    {
+      $set: {
+        failedLoginAttempts: 0,
+        lockUntil: null,
+      },
+    },
+    { new: true }
+  );
+}
