@@ -83,7 +83,7 @@ export async function incrementFailedLoginAttempts(userId) {
   return UserModel.findByIdAndUpdate(
     userId,
     {
-      $inc: { failedLoginAttempts: 1 }, // \$inc adds 1 to the current value
+      $inc: { failedLoginAttempts: 1 }, // $inc adds 1 to the current value
     },
     { new: true } // return the updated user so we can check the new count
   );
