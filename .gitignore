@@ -21,3 +21,9 @@ coverage/
 
 # Judge0 config (contains credentials)
 infra/docker/judge0.conf
+
+# Terraform
+infra/terraform/.terraform/
+infra/terraform/.terraform.lock.hcl
+infra/terraform/terraform.tfstate
+infra/terraform/terraform.tfstate.backup
