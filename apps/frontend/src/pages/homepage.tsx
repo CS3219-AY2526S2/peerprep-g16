@@ -5,6 +5,10 @@ import { useNavigate } from "react-router-dom";
 import MatchmakingOverlay from "../components/matchmakingOverlay";
 import TopicSelectionOverlay from "../components/topicSelectionOverlay";
 
+const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
+const QUESTION_SERVICE_URL = import.meta.env.VITE_QUESTION_SERVICE_URL as string;
+const MATCHING_SERVICE_URL = import.meta.env.VITE_MATCHING_SERVICE_URL as string;
+
 function Homepage() {
     const navigate = useNavigate();
     const [topic, setTopic] = useState("");
@@ -34,7 +38,7 @@ function Homepage() {
         if (!topic) { setError(true); return; }
 
         try {
-            await api.get("http://localhost:3001/auth/verify-token");
+            await api.get(`${USER_SERVICE_URL}/auth/verify-token`);
         } catch {
             return; // interceptor handles PRIVILEGE_CHANGED
         }
@@ -60,7 +64,7 @@ function Homepage() {
     useEffect(() => {
         const fetchTopics = async () => {
             try {
-                const response = await api.get("http://localhost:3002/questions/topics");
+                const response = await api.get(`${QUESTION_SERVICE_URL}/questions/topics`);
                 setTopics(response.data.topics);
             } catch (err) {
                 console.error("Failed to fetch topics", err);
@@ -80,7 +84,7 @@ function Homepage() {
 
         const checkExistingQueue = async () => {
             try {
-                const response = await api.get(`http://localhost:3004/api/match/${user.id}`);
+                const response = await api.get(`${MATCHING_SERVICE_URL}/api/match/${user.id}`);
 
                 if (response.data.status === 'matched') {
                     // Already matched before they refreshed
@@ -127,7 +131,7 @@ function Homepage() {
 
         const start = async () => {
             try {
-                const response = await api.post("http://localhost:3004/api/match", {
+                const response = await api.post("${MATCHING_SERVICE_URL}/api/match", {
                     userId: user.id,
                     username: user.username,
                     topic,
@@ -141,7 +145,7 @@ function Homepage() {
                 }
 
                 if (response.data.status === 'already_matched') {
-                    const statusResponse = await api.get(`http://localhost:3004/api/match/${user.id}`);
+                    const statusResponse = await api.get(`${MATCHING_SERVICE_URL}/api/match/${user.id}`);
                     if (statusResponse.data.status === 'matched') {
                         handleMatchFound(statusResponse.data);
                         return;
@@ -185,7 +189,7 @@ function Homepage() {
         const user = stored ? JSON.parse(stored) : null;
         if (user) {
             try {
-                await api.delete(`http://localhost:3004/api/match/${user.id}`);
+                await api.delete(`${MATCHING_SERVICE_URL}/api/match/${user.id}`);
             } catch (err) {
                 console.error(err);
             }
@@ -199,7 +203,7 @@ function Homepage() {
                 return;
             }
             try {
-                const statusResponse = await api.get(`http://localhost:3004/api/match/${userId}`);
+                const statusResponse = await api.get(`${MATCHING_SERVICE_URL}/api/match/${userId}`);
 
                 if (statusResponse.data.status === "matched") {
                     handleMatchFound(statusResponse.data);
