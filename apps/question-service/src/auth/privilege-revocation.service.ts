@@ -138,41 +138,8 @@ export class PrivilegeRevocationService implements OnModuleInit, OnModuleDestroy
      * - persists the latest timestamp to Redis for cold-start fallback
      */
     private registerRedisEventHandlers(): void {
-        this.redisSubscriber.on('message', async(channel, message) => {
-            if (channel !== this.channelName) {
-                return;
-            }
-
-            try {
-                const event = JSON.parse(message) as PrivilegeChangeEvent;
-
-                if (!event.userId || typeof event.timestamp !== 'number') {
-                    this.logger.warn(
-                        `Ignoring malformed privilege change event: ${message}`,
-                    );
-                    return;
-                }
-
-                const key = this.getRevocationKey(event.userId);
-                const previousTimestamp = this.revocationCache.get(event.userId);
-
-                if (
-                    previousTimestamp === undefined ||
-                    event.timestamp > previousTimestamp
-                ) {
-                    this.revocationCache.set(event.userId, event.timestamp);
-                    await this.redisClient.set(key, String(event.timestamp));
-                }
-
-                this.logger.log(
-                   `Updated privilege revocation timestamp for user ${event.userId} to ${event.timestamp}`,
-                );
-            } catch (error) {
-                this.logger.error(
-                    `Failed to process privilege change event: ${message}`,
-                    error instanceof Error ? error.stack : undefined,
-                );
-            }
+        this.redisSubscriber.on('message', (channel, message) => {
+            void this.handlePrivilegeChangeMessage(channel, message);
         });
 
         this.redisSubscriber.on('error', (error) => {
@@ -184,10 +151,63 @@ export class PrivilegeRevocationService implements OnModuleInit, OnModuleDestroy
 
         this.redisClient.on('error', (error) => {
             this.logger.error(
-               'Redis client error',
+                'Redis client error',
                 error instanceof Error ? error.stack : undefined,
             );
         });
+    }
+
+    /**
+     * Processes a single privilege-change Pub/Sub message from Redis.
+     *
+     * The handler validates the incoming payload, updates the in-memory revocation
+     * cache, and persists the latest timestamp to Redis so newly started instances
+     * can enforce revocations immediately.
+     *
+     * This method is invoked through a fire-and-forget event listener so the Redis
+     * callback itself can remain synchronous and satisfy linting rules.
+     *
+     * @param channel Redis Pub/Sub channel name
+     * @param message Raw JSON event payload
+     * @returns Promise that resolves when processing is complete
+     */
+    private async handlePrivilegeChangeMessage(
+        channel: string,
+        message: string,
+    ): Promise<void> {
+        if (channel !== this.channelName) {
+            return;
+        }
+        try {
+            const event = JSON.parse(message) as PrivilegeChangeEvent;
+
+            if (!event.userId || typeof event.timestamp !== 'number') {
+                this.logger.warn(
+                    `Ignoring malformed privilege change event: ${message}`,
+                );
+                return;
+            }
+
+            const key = this.getRevocationKey(event.userId);
+            const previousTimestamp = this.revocationCache.get(event.userId);
+
+            if (
+                previousTimestamp === undefined ||
+                event.timestamp > previousTimestamp
+            ) {
+                this.revocationCache.set(event.userId, event.timestamp);
+                await this.redisClient.set(key, String(event.timestamp));
+            }
+
+            this.logger.log(
+                `Updated privilege revocation timestamp for user ${event.userId} to ${event.timestamp}`,
+            );
+        } catch (error) {
+            this.logger.error(
+                `Failed to process privilege change event: ${message}`,
+                error instanceof Error ? error.stack : undefined,
+            );
+        }
     }
 
     /**

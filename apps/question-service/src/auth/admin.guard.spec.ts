@@ -27,11 +27,6 @@ type MockJwtPayload = {
   exp?: number;
 };
 
-const decodedToken: MockJwtPayload = {
-  id: '1',
-  isAdmin: true,
-};
-
 const mockedVerify = jest.mocked(verify);
 
 jest.mock('jsonwebtoken', () => ({
