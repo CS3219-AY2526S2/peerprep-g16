@@ -3,12 +3,12 @@ import {
   ExecutionContext,
   ForbiddenException,
   Injectable,
-  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
 import * as jwt from 'jsonwebtoken';
+import { PrivilegeRevocationService } from './privilege-revocation.service';
 
 /**
  * Extended Express request type that includes authenticated user information.
@@ -23,49 +23,42 @@ type AuthenticatedRequest = Request & {
 
 /**
  * Expected structure of the decoded JWT payload.
+ * 
+ * `iat` and `exp` are standard JWT claims returned by `jsonwebtoken`.
  */
 type JwtPayload = {
   id: string;
   isAdmin: boolean;
+  iat?: number;
+  exp?: number;
 };
 
 /**
- * Expected structure of the response returned by the user-service
- * when verifying a token.
- */
-type VerifyTokenResponse = {
-  data?: {
-    id: string;
-    username: string;
-    email: string;
-    isAdmin: boolean;
-  };
-};
-
-/**
- * Guard that ensures the requesting user is authenticated and has admin privileges.
+ * Guard that ensures the requesting user is authenticated with a non-revoked 
+ * token and has admin privileges.
  *
- * This guard validates the Authorization header by verifying the JWT locally
- * using the shared JWT_SECRET, without making any network calls to user-service.
- * If the token is valid and the user has `isAdmin = true`, the request proceeds.
- *
- * The verified user information is attached to `request.user` so that downstream
- * controllers or services can access the authenticated user context.
+ * Validation step:
+ * 1. Extract Bearer token from the Authorization header
+ * 2. Verify JWT signature and expiry locally
+ * 3. Reject tokens invalidated by a privilege-change event
+ * 4. Enforce `isAdmin === true`
+ * 5. Attach the authenticated user to `request.user`
  */
 @Injectable()
 export class AdminGuard implements CanActivate {
-  constructor(private readonly configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly privilegeRevocationService: PrivilegeRevocationService,
+  ) {}
 
   /**
-   * Determines whether the current request is allowed to proceed.
+   * Determines whether the current HTTP request may proceed.
    *
-   * Extracts the Bearer token from the Authorization header, verifies its
-   * signature and expiry locally, then checks for admin privileges.
-   *
-   * @param context - NestJS execution context containing request information
-   * @returns true if the user is authenticated and is an admin
-   * @throws UnauthorizedException if the token is missing, invalid, or expired
-   * @throws ForbiddenException if the user is not an admin
+   * @param context Nest execution context containing the current request
+   * @returns `true` when the request is authenticated and authorized
+   * @throws UnauthorizedException when the token is missing, invalid, expired,
+   * or revoked due to a privilege change
+   * @throws ForbiddenException when the user is authenticated but not an admin
    */
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
@@ -86,6 +79,19 @@ export class AdminGuard implements CanActivate {
       // Verifies signature and expiry locally — no call to user-service needed
       const payload = jwt.verify(token, secret) as JwtPayload;
 
+      const revoked = 
+        await this.privilegeRevocationService.isTokenRevoked(
+          payload.id,
+          payload.iat,
+        );
+      
+      if (revoked) {
+        throw new UnauthorizedException({
+          message: 'Privilege changed. Please log in again.',
+          code: 'PRIVILEGE_CHANGED',
+        });
+      }
+
       if (!payload.isAdmin) {
         throw new ForbiddenException('Not authorized to access this resource');
       }
@@ -94,6 +100,7 @@ export class AdminGuard implements CanActivate {
       return true;
     } catch (error) {
       if (error instanceof ForbiddenException) throw error;
+      if (error instanceof UnauthorizedException) throw error;
       if (error instanceof jwt.TokenExpiredError) {
         throw new UnauthorizedException('Token expired');
       }

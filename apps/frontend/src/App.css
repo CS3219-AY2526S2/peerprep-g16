@@ -1,8 +1,15 @@
 #root {
-  max-width: auto;
+  max-width: "100%";
   margin: 0 auto;
+  padding-top: 2rem;
+  /* padding: 2rem; */
   text-align: center;
   padding-top: 2rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
 }
 
 body, html {

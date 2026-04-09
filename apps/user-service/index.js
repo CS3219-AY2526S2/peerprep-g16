@@ -30,6 +30,17 @@ app.use((req, res, next) => {
   next();
 });
 
+// ============================================
+// Health check endpoint for Docker
+// ============================================
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    service: "user-service",
+  });
+});
+// ============================================
+
 app.use("/users", userRoutes);
 app.use("/auth", authRoutes);
 

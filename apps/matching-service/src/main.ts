@@ -3,6 +3,14 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  await app.listen(process.env.PORT ?? 3000);
+  app.enableCors({
+    origin: 'http://localhost:5173',  // your frontend URL
+    methods: ['GET', 'POST', 'DELETE', 'PUT', 'PATCH'],
+    credentials: true,
+  });
+  const port = process.env.PORT ?? 3004;
+  await app.listen(port);
+  console.log('Matching Service running on port ' + port);
 }
-bootstrap();
+
+void bootstrap();

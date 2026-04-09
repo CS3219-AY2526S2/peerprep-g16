@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { Question, QuestionDocument } from './schemas/question.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { SelectQuestionDto } from './dto/select-question.dto';
 
 /**
  * Service layer for question-related business logic.
@@ -109,4 +110,83 @@ export class QuestionService {
     return topics.sort((a, b) => a.localeCompare(b));
   }
 
+  /**
+   * Selects a question based on topic and difficulty, with optional exclusion logic.
+   *
+   * Selection process:
+   * 1. Attempt to retrieve questions matching the given topic(s) and difficulty,
+   *    excluding any question IDs provided in excludeQuestionIds.
+   * 2. If no unattempted questions are found, retry the query without exclusion
+   *    to allow reuse of previously attempted questions.
+   * 3. If no questions exist at all for the given criteria, throw a NotFoundException.
+   *
+   * This ensures that users are prioritised with unseen questions while still
+   * guaranteeing that a question can be returned whenever possible.
+   *
+   * @param selectQuestionDto - Object containing:
+   *   - topics: array of topics to filter by
+   *   - difficulty: difficulty level (Easy | Medium | Hard)
+   *   - excludeQuestionIds (optional): list of questionIds to exclude
+   *
+   * @returns A randomly selected Question document
+   *
+   * @throws NotFoundException if no questions exist for the given criteria
+   */
+  async selectQuestion(selectQuestionDto: SelectQuestionDto): Promise<Question> {
+    const {
+      topic,
+      difficulty,
+      attemptedQuestionIds = [],
+    } = selectQuestionDto;
+
+    const uniqueExcludeIds = Array.from(new Set(attemptedQuestionIds));
+
+    // Step 1: try to find unattempted questions first
+    const primaryFilter: Record<string, any> = { topic };
+    if (difficulty) primaryFilter.difficulty = difficulty;
+    if (uniqueExcludeIds.length > 0) {
+      primaryFilter.questionId = { $nin: uniqueExcludeIds };
+    }
+
+    const freshQuestions = await this.questionModel.find(primaryFilter).exec();
+
+    if (freshQuestions.length > 0) {
+      return this.pickRandomQuestion(freshQuestions);
+    }
+
+    // Step 2: fallback — allow previously attempted questions
+    const fallbackFilter: Record<string, any> = { topic };
+    if (difficulty) fallbackFilter.difficulty = difficulty;
+
+    const fallbackQuestions = await this.questionModel
+      .find(fallbackFilter)
+      .exec();
+
+    if (fallbackQuestions.length > 0) {
+      return this.pickRandomQuestion(fallbackQuestions);
+    }
+
+    // Step 3: fallback 2 — allow other difficulty levels
+    const fallbackFilter2 = {
+      topic,
+    };
+
+    const fallbackQuestions2 = await this.questionModel
+      .find(fallbackFilter2)
+      .exec();
+
+    if (fallbackQuestions2.length > 0) {
+      return this.pickRandomQuestion(fallbackQuestions2);
+    }
+
+    // Step 4: true no-question case
+    throw new NotFoundException(
+      `No question found for ${topic}`,
+    );
+  }
+
+  private pickRandomQuestion(questions: Question[]): Question {
+    const randomIndex = Math.floor(Math.random() * questions.length);
+    return questions[randomIndex];
+  }
 }
