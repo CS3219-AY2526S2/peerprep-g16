@@ -87,12 +87,11 @@ export class UserGuard implements CanActivate {
       }
 
       const payload = decoded;
-      const revoked =
-        await this.privilegeRevocationService.isTokenRevoked(
-          payload.id, 
-          payload.iat,
-        );
-      
+      const revoked = await this.privilegeRevocationService.isTokenRevoked(
+        payload.id,
+        payload.iat,
+      );
+
       if (revoked) {
         throw new UnauthorizedException({
           message: 'Privilege changed. Please log in again.',
@@ -114,7 +113,7 @@ export class UserGuard implements CanActivate {
       if (error instanceof TokenExpiredError) {
         throw new UnauthorizedException('Token expired');
       }
-      
+
       throw new UnauthorizedException('Authentication failed');
     }
   }

@@ -7,9 +7,9 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
-import { 
-  TokenExpiredError, 
-  type JwtPayload as BaseJwtPayload, 
+import {
+  TokenExpiredError,
+  type JwtPayload as BaseJwtPayload,
   verify,
 } from 'jsonwebtoken';
 import { PrivilegeRevocationService } from './privilege-revocation.service';
@@ -51,7 +51,7 @@ function isAuthJwtPayload(
 }
 
 /**
- * Guard that ensures the requesting user is authenticated with a non-revoked 
+ * Guard that ensures the requesting user is authenticated with a non-revoked
  * token and has admin privileges.
  *
  * Validation step:
@@ -102,12 +102,10 @@ export class AdminGuard implements CanActivate {
 
       const payload = decoded;
 
-      const revoked = 
-        await this.privilegeRevocationService.isTokenRevoked(
-          payload.id,
-          payload.iat,
-        );
-      
+      const revoked = await this.privilegeRevocationService.isTokenRevoked(
+        payload.id,
+        payload.iat,
+      );
       if (revoked) {
         throw new UnauthorizedException({
           message: 'Privilege changed. Please log in again.',

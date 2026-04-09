@@ -1,8 +1,11 @@
-import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  ExecutionContext,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TokenExpiredError, verify } from 'jsonwebtoken';
 import { AdminGuard } from './admin.guard';
-
 
 type MockUser = {
   id: string;
@@ -16,15 +19,10 @@ type MockRequest = {
   user?: MockUser;
 };
 
-type MockPrivilegeRevocationService = {
-  isTokenRevoked: jest.Mock<Promise<boolean>, [string, number | undefined]>;
-};
+type IsTokenRevokedFn = (userId: string, issuedAt?: number) => Promise<boolean>;
 
-type MockJwtPayload = {
-  id: string;
-  isAdmin: boolean;
-  iat?: number;
-  exp?: number;
+type MockPrivilegeRevocationService = {
+  isTokenRevoked: jest.MockedFunction<IsTokenRevokedFn>;
 };
 
 const mockedVerify = jest.mocked(verify);
@@ -80,9 +78,10 @@ describe('AdminGuard', () => {
    *
    * @returns Mocked privilege revocation service
    */
-  const createPrivilegeRevocationService = (): MockPrivilegeRevocationService => ({
-    isTokenRevoked: jest.fn().mockResolvedValue(false),
-  });
+  const createPrivilegeRevocationService =
+    (): MockPrivilegeRevocationService => ({
+      isTokenRevoked: jest.fn<IsTokenRevokedFn>().mockResolvedValue(false),
+    });
 
   /**
    * Creates a mock config service that resolves the JWT secret used in tests.
@@ -158,7 +157,7 @@ describe('AdminGuard', () => {
       createPrivilegeRevocationService() as never,
     );
 
-    (mockedVerify).mockReturnValue({
+    mockedVerify.mockReturnValue({
       id: '2',
       isAdmin: false,
     });
@@ -178,10 +177,9 @@ describe('AdminGuard', () => {
       createPrivilegeRevocationService() as never,
     );
 
-    (mockedVerify).mockImplementation(() => {
+    mockedVerify.mockImplementation(() => {
       throw new Error('invalid token');
     });
-
 
     await expect(
       guard.canActivate(createExecutionContext(getRequest())),
@@ -200,7 +198,7 @@ describe('AdminGuard', () => {
 
     await expect(
       guard.canActivate(createExecutionContext(getRequest())),
-    ).rejects.toThrow('Authentication failed');
+    ).rejects.toThrow('JWT_SECRET not configured');
   });
 
   /**
@@ -213,7 +211,7 @@ describe('AdminGuard', () => {
       createPrivilegeRevocationService() as never,
     );
 
-    (mockedVerify).mockImplementation(() => {
+    mockedVerify.mockImplementation(() => {
       throw new TokenExpiredError('jwt expired', new Date());
     });
 

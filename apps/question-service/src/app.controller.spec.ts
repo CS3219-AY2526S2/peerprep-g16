@@ -40,11 +40,11 @@ describe('QuestionController', () => {
         },
       ],
     })
-    .overrideGuard(AdminGuard)
-    .useValue({ canActivate: jest.fn().mockReturnValue(true) })
-    .overrideGuard(UserGuard)
-    .useValue({ canActivate: jest.fn().mockReturnValue(true) })
-    .compile();
+      .overrideGuard(AdminGuard)
+      .useValue({ canActivate: jest.fn().mockReturnValue(true) })
+      .overrideGuard(UserGuard)
+      .useValue({ canActivate: jest.fn().mockReturnValue(true) })
+      .compile();
 
     controller = module.get<QuestionController>(QuestionController);
   });
@@ -63,7 +63,10 @@ describe('QuestionController', () => {
       mockQuestionService.findAll.mockResolvedValue(questions);
 
       await expect(controller.findAll()).resolves.toEqual(questions);
-      expect(mockQuestionService.findAll).toHaveBeenCalledWith(undefined, undefined);
+      expect(mockQuestionService.findAll).toHaveBeenCalledWith(
+        undefined,
+        undefined,
+      );
     });
 
     /**
@@ -71,12 +74,19 @@ describe('QuestionController', () => {
      * query values to the service layer unchanged.
      */
     it('should pass topic and difficulty filters to the service', async () => {
-      const questions = [{ questionId: 'two-sum', topic: 'Arrays', difficulty: 'Easy' }];
+      const questions = [
+        { questionId: 'two-sum', topic: 'Arrays', difficulty: 'Easy' },
+      ];
 
       mockQuestionService.findAll.mockResolvedValue(questions);
 
-      await expect(controller.findAll('Arrays', 'Easy')).resolves.toEqual(questions);
-      expect(mockQuestionService.findAll).toHaveBeenCalledWith('Arrays', 'Easy');
+      await expect(controller.findAll('Arrays', 'Easy')).resolves.toEqual(
+        questions,
+      );
+      expect(mockQuestionService.findAll).toHaveBeenCalledWith(
+        'Arrays',
+        'Easy',
+      );
     });
   });
 
@@ -89,7 +99,7 @@ describe('QuestionController', () => {
       const body = {
         questionId: 'two-sum',
         title: 'Two Sum',
-        topic: 'Arrays',
+        topic: ['Arrays'],
         difficulty: 'Easy',
         description: 'Find two numbers that add up to target.',
         constraints: ['2 <= nums.length <= 10^4'],
@@ -154,8 +164,12 @@ describe('QuestionController', () => {
 
       mockQuestionService.deleteByQuestionId.mockResolvedValue(deletedQuestion);
 
-      await expect(controller.delete('two-sum')).resolves.toEqual(deletedQuestion);
-      expect(mockQuestionService.deleteByQuestionId).toHaveBeenCalledWith('two-sum');
+      await expect(controller.delete('two-sum')).resolves.toEqual(
+        deletedQuestion,
+      );
+      expect(mockQuestionService.deleteByQuestionId).toHaveBeenCalledWith(
+        'two-sum',
+      );
     });
   });
 
@@ -181,7 +195,9 @@ describe('QuestionController', () => {
 
       mockQuestionService.updateByQuestionId.mockResolvedValue(updatedQuestion);
 
-      await expect(controller.update('two-sum', body)).resolves.toEqual(updatedQuestion);
+      await expect(controller.update('two-sum', body)).resolves.toEqual(
+        updatedQuestion,
+      );
       expect(mockQuestionService.updateByQuestionId).toHaveBeenCalledWith(
         'two-sum',
         body,
@@ -210,9 +226,9 @@ describe('QuestionController', () => {
 
       mockQuestionService.selectQuestion.mockResolvedValue(selectedQuestion);
 
-      await expect(controller.selectQuestion(selectQuestionDto)).resolves.toEqual(
-        selectedQuestion,
-      );
+      await expect(
+        controller.selectQuestion(selectQuestionDto),
+      ).resolves.toEqual(selectedQuestion);
       expect(mockQuestionService.selectQuestion).toHaveBeenCalledWith(
         selectQuestionDto,
       );
@@ -236,9 +252,9 @@ describe('QuestionController', () => {
 
       mockQuestionService.selectQuestion.mockResolvedValue(selectedQuestion);
 
-      await expect(controller.selectQuestion(selectQuestionDto)).resolves.toEqual(
-        selectedQuestion,
-      );
+      await expect(
+        controller.selectQuestion(selectQuestionDto),
+      ).resolves.toEqual(selectedQuestion);
       expect(mockQuestionService.selectQuestion).toHaveBeenCalledWith(
         selectQuestionDto,
       );
