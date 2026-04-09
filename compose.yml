@@ -224,11 +224,16 @@ services:
       context: ./apps/frontend
       dockerfile: Dockerfile
       args:
-        - VITE_USER_SERVICE_URL=http://localhost:3001
-        - VITE_QUESTION_SERVICE_URL=http://localhost:3002
-        - VITE_COLLABORATION_SERVICE_URL=http://localhost:3003
-        - VITE_MATCHING_SERVICE_URL=http://localhost:3004
-        - VITE_JUDGE0_URL=http://localhost:2358
+        # - VITE_USER_SERVICE_URL=http://localhost:3001
+        # - VITE_QUESTION_SERVICE_URL=http://localhost:3002
+        # - VITE_COLLABORATION_SERVICE_URL=http://localhost:3003
+        # - VITE_MATCHING_SERVICE_URL=http://localhost:3004
+        # - VITE_JUDGE0_URL=http://localhost:2358
+        - VITE_USER_SERVICE_URL=${PUBLIC_IP}:3001
+        - VITE_QUESTION_SERVICE_URL=${PUBLIC_IP}:3002
+        - VITE_COLLABORATION_SERVICE_URL=${PUBLIC_IP}:3003
+        - VITE_MATCHING_SERVICE_URL=${PUBLIC_IP}:3004
+        - VITE_JUDGE0_URL=${PUBLIC_IP}:2358
     container_name: peerprep-frontend
     restart: unless-stopped
     ports:
