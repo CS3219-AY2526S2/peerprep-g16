@@ -20,7 +20,7 @@ function Register() {
         else if (!handleConfirmPasswordValidation()) return
 
         try {
-            await api.post('${USER_SERVICE_URL}/users', {
+            await api.post(`${USER_SERVICE_URL}/users`, {
                 username,
                 email,
                 password,
