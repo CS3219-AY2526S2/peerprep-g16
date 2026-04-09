@@ -96,7 +96,7 @@ function AdminPage() {
 
     const fetchUsers = async () => {
         try {
-            const response = await api.get("${USER_SERVICE_URL}/users",
+            const response = await api.get(`${USER_SERVICE_URL}/users`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setUsers(response.data.data);
@@ -159,7 +159,7 @@ function AdminPage() {
 
     const fetchQuestions = async () => {
         try {
-            const response = await api.get("${QUESTION_SERVICE_URL}/questions",
+            const response = await api.get(`${QUESTION_SERVICE_URL}/questions`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestions(response.data);
@@ -211,7 +211,7 @@ function AdminPage() {
             return;
         }
         try {
-            await api.post("${QUESTION_SERVICE_URL}/questions",
+            await api.post(`${QUESTION_SERVICE_URL}/questions`,
                 newQuestion,
                 { headers: { Authorization: `Bearer ${token}` } }
             );

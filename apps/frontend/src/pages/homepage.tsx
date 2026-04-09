@@ -131,7 +131,7 @@ function Homepage() {
 
         const start = async () => {
             try {
-                const response = await api.post("${MATCHING_SERVICE_URL}/api/match", {
+                const response = await api.post(`${MATCHING_SERVICE_URL}/api/match`, {
                     userId: user.id,
                     username: user.username,
                     topic,
