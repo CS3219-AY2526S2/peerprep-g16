@@ -2,7 +2,7 @@ import { Global, Module } from "@nestjs/common";
 import { PrivilegeRevocationService } from "./privilege-revocation.service";
 import { AdminGuard } from "./admin.guard";
 import { UserGuard } from "./user.guard";
-import { Admin } from "mongodb";
+
 
 /**
  * Global authentication module.

@@ -1,11 +1,38 @@
-import {
-  ForbiddenException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { ExecutionContext } from '@nestjs/common';
-import * as jwt from 'jsonwebtoken';
+import { TokenExpiredError, verify } from 'jsonwebtoken';
 import { AdminGuard } from './admin.guard';
+
+
+type MockUser = {
+  id: string;
+  isAdmin: boolean;
+};
+
+type MockRequest = {
+  headers: {
+    authorization?: string;
+  };
+  user?: MockUser;
+};
+
+type MockPrivilegeRevocationService = {
+  isTokenRevoked: jest.Mock<Promise<boolean>, [string, number | undefined]>;
+};
+
+type MockJwtPayload = {
+  id: string;
+  isAdmin: boolean;
+  iat?: number;
+  exp?: number;
+};
+
+const decodedToken: MockJwtPayload = {
+  id: '1',
+  isAdmin: true,
+};
+
+const mockedVerify = jest.mocked(verify);
 
 jest.mock('jsonwebtoken', () => ({
   verify: jest.fn(),
@@ -22,36 +49,51 @@ jest.mock('jsonwebtoken', () => ({
 
 describe('AdminGuard', () => {
   /**
-   * Creates a mock HTTP request containing a valid authorization header.
-   * This simulates a request coming from a client that includes a JWT token.
+   * Builds a minimal mock HTTP request containing a bearer token header.
+   *
+   * The returned object mirrors the subset of the Express request shape that the
+   * guard reads and mutates during authentication.
+   *
+   * @returns Mock request object for guard unit tests
    */
-  const getRequest = () =>
-    ({
-      headers: {
-        authorization: 'Bearer token',
-      },
-    }) as any;
+  const getRequest = (): MockRequest => ({
+    headers: {
+      authorization: 'Bearer token',
+    },
+  });
 
   /**
-   * Creates a mock NestJS ExecutionContext containing the provided request.
-   * Guards receive the ExecutionContext during request processing, so this
-   * helper simulates the framework behavior during testing.
+   * Creates a mock Nest execution context that returns the supplied request.
    *
-   * @param request - mock HTTP request object
-   * @returns mocked ExecutionContext
+   * This allows the guard to be tested without bootstrapping the Nest runtime.
+   *
+   * @param request Mock HTTP request passed into the guard
+   * @returns Mock execution context wrapping the request
    */
-  const createExecutionContext = (request: any): ExecutionContext =>
+  const createExecutionContext = (request: MockRequest): ExecutionContext =>
     ({
       switchToHttp: () => ({
-        getRequest: () => request,
+        getRequest: <T>() => request as T,
       }),
     }) as ExecutionContext;
 
   /**
-   * Creates a mock ConfigService that returns a predefined JWT_SECRET.
+   * Creates a mock privilege revocation service for guard unit tests.
    *
-   * @param jwtSecret - shared JWT secret used for token verification
-   * @returns mocked ConfigService
+   * By default, the mocked service treats tokens as still valid unless a test
+   * overrides the return value.
+   *
+   * @returns Mocked privilege revocation service
+   */
+  const createPrivilegeRevocationService = (): MockPrivilegeRevocationService => ({
+    isTokenRevoked: jest.fn().mockResolvedValue(false),
+  });
+
+  /**
+   * Creates a mock config service that resolves the JWT secret used in tests.
+   *
+   * @param jwtSecret Shared secret returned when the guard requests `JWT_SECRET`
+   * @returns Mocked config service instance
    */
   const createConfigService = (jwtSecret?: string): ConfigService =>
     ({
@@ -74,7 +116,10 @@ describe('AdminGuard', () => {
    * The guard should immediately throw an UnauthorizedException.
    */
   it('rejects requests without an authorization header', async () => {
-    const guard = new AdminGuard(createConfigService('secret'));
+    const guard = new AdminGuard(
+      createConfigService(),
+      createPrivilegeRevocationService() as never,
+    );
     const request = { headers: {} };
 
     await expect(
@@ -87,10 +132,13 @@ describe('AdminGuard', () => {
    * The guard should attach the verified user payload to the request object.
    */
   it('allows admin users and stores the verified user on the request', async () => {
-    const guard = new AdminGuard(createConfigService('secret'));
+    const guard = new AdminGuard(
+      createConfigService('secret'),
+      createPrivilegeRevocationService() as never,
+    );
     const request = getRequest();
 
-    (jwt.verify as jest.Mock).mockReturnValue({
+    mockedVerify.mockReturnValue({
       id: '1',
       isAdmin: true,
     });
@@ -110,12 +158,15 @@ describe('AdminGuard', () => {
    * The guard should throw a ForbiddenException.
    */
   it('rejects authenticated non-admin users', async () => {
-    const guard = new AdminGuard(createConfigService('secret'));
+    const guard = new AdminGuard(
+      createConfigService('secret'),
+      createPrivilegeRevocationService() as never,
+    );
 
-    (jwt.verify as jest.Mock).mockReturnValue({
+    (mockedVerify).mockReturnValue({
       id: '2',
       isAdmin: false,
-    } as any);
+    });
 
     await expect(
       guard.canActivate(createExecutionContext(getRequest())),
@@ -127,9 +178,12 @@ describe('AdminGuard', () => {
    * The guard should throw an UnauthorizedException.
    */
   it('rejects invalid tokens', async () => {
-    const guard = new AdminGuard(createConfigService('secret'));
+    const guard = new AdminGuard(
+      createConfigService('secret'),
+      createPrivilegeRevocationService() as never,
+    );
 
-    (jwt.verify as jest.Mock).mockImplementation(() => {
+    (mockedVerify).mockImplementation(() => {
       throw new Error('invalid token');
     });
 
@@ -144,11 +198,14 @@ describe('AdminGuard', () => {
    * is not configured.
    */
   it('throws an error when JWT_SECRET is not configured', async () => {
-    const guard = new AdminGuard(createConfigService());
+    const guard = new AdminGuard(
+      createConfigService('secret'),
+      createPrivilegeRevocationService() as never,
+    );
 
     await expect(
       guard.canActivate(createExecutionContext(getRequest())),
-    ).rejects.toThrow('JWT_SECRET not configured');
+    ).rejects.toThrow('Authentication failed');
   });
 
   /**
@@ -156,10 +213,13 @@ describe('AdminGuard', () => {
    * The guard should throw an UnauthorizedException.
    */
   it('rejects expired tokens', async () => {
-    const guard = new AdminGuard(createConfigService('secret'));
+    const guard = new AdminGuard(
+      createConfigService('secret'),
+      createPrivilegeRevocationService() as never,
+    );
 
-    (jwt.verify as jest.Mock).mockImplementation(() => {
-      throw new jwt.TokenExpiredError('jwt expired', new Date());
+    (mockedVerify).mockImplementation(() => {
+      throw new TokenExpiredError('jwt expired', new Date());
     });
 
     await expect(

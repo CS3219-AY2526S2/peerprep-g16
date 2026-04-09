@@ -1,6 +1,7 @@
 import { HttpService } from "@nestjs/axios";
 import { HttpException, Injectable, Logger } from "@nestjs/common";
 import { firstValueFrom } from "rxjs";
+import { isAxiosError, type AxiosError } from 'axios';
 
 /**
  * CollaborationClient sends selected questions
@@ -58,14 +59,15 @@ export class CollaborationClient {
             testCases: question.testCases,
         };
 
-        let lastError: any;
+        type CollaborationErrorResponse = {
+            message?: string;
+        };
+
+        let lastError: AxiosError<CollaborationErrorResponse> | Error | undefined;
+
 
         for (let attempt = 1; attempt <= this.maxAttempts; attempt++) {
             try {
-                this.logger.log(
-                    `Attempt ${attempt}/${this.maxAttempts}: sending question ${question.questionId} for matchRequestId=${matchRequestId}`,
-                );
-
                 const response = await firstValueFrom(
                     this.httpService.post(url, payload),
                 );
@@ -75,19 +77,23 @@ export class CollaborationClient {
                 );
 
                 return;
-            } catch (error: any) {
-                lastError = error;
+            } catch (error: unknown) {
+                const message =
+                    error instanceof Error ? error.message : 'Unknown error';
 
                 this.logger.warn(
-                `Attempt ${attempt}/${this.maxAttempts} failed for matchRequestId=${matchRequestId}: ${
-                    error?.message || 'Unknown error'
-                }`,
+                    `Attempt ${attempt}/${this.maxAttempts} failed for matchRequestId=${matchRequestId}: ${message}`,
                 );
 
-                const status = error?.response?.status;
+                if (isAxiosError<CollaborationErrorResponse>(error)) {
+                    lastError = error;
+                    const status = error.response?.status;
 
-                if (status && status < 500 && status !== 429) {
+                    if (status !== undefined && status < 500 && status !== 429) {
                     break;
+                    }
+                } else {
+                    lastError = error instanceof Error ? error : new Error('Unknown error');
                 }
 
                 if (attempt < this.maxAttempts) {
@@ -100,9 +106,14 @@ export class CollaborationClient {
             `All delivery attempts failed for matchRequestId=${matchRequestId}. The caller should retry later with the same assigned question.`,
         );
 
+        const status =
+            isAxiosError(lastError) && lastError.response?.status !== undefined
+            ? lastError.response.status
+            : 500;
+
         throw new HttpException(
             'Failed to send question to Collaboration Service',
-            lastError?.response?.status || 500,
+            status,
         );
     }
 
@@ -112,6 +123,8 @@ export class CollaborationClient {
      * @param ms number of milliseconds to wait
      */
     private sleep(ms: number): Promise<void> {
-        return new Promise((resolve) => setTimeout(resolve, ms));
+        return new Promise((resolve) => {
+            setTimeout(() => resolve(), ms);
+        });
     }
 }

@@ -7,7 +7,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
-import * as jwt from 'jsonwebtoken';
+import { 
+  TokenExpiredError, 
+  type JwtPayload as BaseJwtPayload, 
+  verify,
+} from 'jsonwebtoken';
 import { PrivilegeRevocationService } from './privilege-revocation.service';
 
 /**
@@ -21,17 +25,30 @@ type AuthenticatedRequest = Request & {
   };
 };
 
-/**
- * Expected structure of the decoded JWT payload.
- * 
- * `iat` and `exp` are standard JWT claims returned by `jsonwebtoken`.
- */
-type JwtPayload = {
+type AuthJwtPayload = BaseJwtPayload & {
   id: string;
   isAdmin: boolean;
-  iat?: number;
-  exp?: number;
 };
+
+/**
+ * Narrows a decoded JWT value to the application-specific payload shape.
+ *
+ * `jsonwebtoken.verify` may return either a string or a generic payload object.
+ * This guard ensures the decoded value includes the fields required by this
+ * service before it is treated as an authenticated user token.
+ *
+ * @param value Decoded JWT value returned by `verify`
+ * @returns `true` when the payload contains a string `id` and boolean `isAdmin`
+ */
+function isAuthJwtPayload(
+  value: string | BaseJwtPayload,
+): value is AuthJwtPayload {
+  return (
+    typeof value !== 'string' &&
+    typeof value.id === 'string' &&
+    typeof value.isAdmin === 'boolean'
+  );
+}
 
 /**
  * Guard that ensures the requesting user is authenticated with a non-revoked 
@@ -77,7 +94,13 @@ export class AdminGuard implements CanActivate {
 
     try {
       // Verifies signature and expiry locally — no call to user-service needed
-      const payload = jwt.verify(token, secret) as JwtPayload;
+      const decoded = verify(token, secret);
+
+      if (!isAuthJwtPayload(decoded)) {
+        throw new UnauthorizedException('Authentication failed');
+      }
+
+      const payload = decoded;
 
       const revoked = 
         await this.privilegeRevocationService.isTokenRevoked(
@@ -101,7 +124,7 @@ export class AdminGuard implements CanActivate {
     } catch (error) {
       if (error instanceof ForbiddenException) throw error;
       if (error instanceof UnauthorizedException) throw error;
-      if (error instanceof jwt.TokenExpiredError) {
+      if (error instanceof TokenExpiredError) {
         throw new UnauthorizedException('Token expired');
       }
       throw new UnauthorizedException('Authentication failed');

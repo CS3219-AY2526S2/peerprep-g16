@@ -2,6 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { QuestionController } from './question/question.controller';
 import { QuestionService } from './question/question.service';
+import { SelectQuestionDto } from './question/dto/select-question.dto';
+import { AdminGuard } from './auth/admin.guard';
+import { UserGuard } from './auth/user.guard';
 
 describe('QuestionController', () => {
   let controller: QuestionController;
@@ -12,6 +15,7 @@ describe('QuestionController', () => {
     create: jest.fn(),
     deleteByQuestionId: jest.fn(),
     updateByQuestionId: jest.fn(),
+    selectQuestion: jest.fn(),
   };
 
   /**
@@ -35,7 +39,12 @@ describe('QuestionController', () => {
           },
         },
       ],
-    }).compile();
+    })
+    .overrideGuard(AdminGuard)
+    .useValue({ canActivate: jest.fn().mockReturnValue(true) })
+    .overrideGuard(UserGuard)
+    .useValue({ canActivate: jest.fn().mockReturnValue(true) })
+    .compile();
 
     controller = module.get<QuestionController>(QuestionController);
   });
@@ -176,6 +185,62 @@ describe('QuestionController', () => {
       expect(mockQuestionService.updateByQuestionId).toHaveBeenCalledWith(
         'two-sum',
         body,
+      );
+    });
+  });
+
+  describe('selectQuestion', () => {
+    /**
+     * Verifies that the controller forwards the selection request
+     * to the service and returns the selected question unchanged.
+     */
+    it('should select a question via the service', async () => {
+      const selectQuestionDto: SelectQuestionDto = {
+        topic: 'Arrays',
+        difficulty: 'Easy',
+        attemptedQuestionIds: ['two-sum', 'contains-duplicate'],
+      };
+
+      const selectedQuestion = {
+        questionId: 'best-time-to-buy-and-sell-stock',
+        title: 'Best Time to Buy and Sell Stock',
+        topic: ['Arrays'],
+        difficulty: 'Easy',
+      };
+
+      mockQuestionService.selectQuestion.mockResolvedValue(selectedQuestion);
+
+      await expect(controller.selectQuestion(selectQuestionDto)).resolves.toEqual(
+        selectedQuestion,
+      );
+      expect(mockQuestionService.selectQuestion).toHaveBeenCalledWith(
+        selectQuestionDto,
+      );
+    });
+
+    /**
+     * Verifies that the controller still delegates correctly when
+     * only the required topic field is provided.
+     */
+    it('should select a question when only topic is provided', async () => {
+      const selectQuestionDto: SelectQuestionDto = {
+        topic: 'Graphs',
+      };
+
+      const selectedQuestion = {
+        questionId: 'number-of-islands',
+        title: 'Number of Islands',
+        topic: ['Graphs'],
+        difficulty: 'Medium',
+      };
+
+      mockQuestionService.selectQuestion.mockResolvedValue(selectedQuestion);
+
+      await expect(controller.selectQuestion(selectQuestionDto)).resolves.toEqual(
+        selectedQuestion,
+      );
+      expect(mockQuestionService.selectQuestion).toHaveBeenCalledWith(
+        selectQuestionDto,
       );
     });
   });
