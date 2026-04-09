@@ -13,7 +13,8 @@ function getToken(): string {
 export function connectSocket(): Socket {
     if (socket?.connected) return socket;
 
-    socket = io(COLLAB_URL, {
+    socket = io("https://peerprep16.duckdns.org", {
+        path: "/api/collaboration/socket.io",
         auth: { token: getToken() },
     });
 
