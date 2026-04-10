@@ -71,7 +71,8 @@ function parseValue(raw: string): any {
 /**
  * Parse "nums = [-1,0,3], target = 9" → [{name:"nums", value:[-1,0,3]}, {name:"target", value:9}]
  */
-function parseInputString(input: string): ParsedVar[] {
+function parseInputString(input: unknown): ParsedVar[] {
+    if (typeof input !== 'string') return [];
     if (!input.trim()) return [];
     return splitTopLevel(input.trim()).flatMap(seg => {
         const eq = seg.indexOf('=');
