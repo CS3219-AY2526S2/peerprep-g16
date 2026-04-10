@@ -2,7 +2,6 @@ import { Controller, Get, Post, Body, BadRequestException, InternalServerErrorEx
 import { ConfigService } from '@nestjs/config';
 import { AppService } from './app.service';
 
-// Judge0 CE language IDs
 const LANGUAGE_IDS: Record<string, number> = {
     python: 71,
     javascript: 63,
@@ -23,14 +22,6 @@ export class AppController {
         return this.appService.getHello();
     }
 
-    /**
-     * Proxies code execution to Judge0 CE (RapidAPI).
-     * Keeps the API key server-side.
-     *
-     * POST /execute
-     * Body: { language: string, code: string, stdin?: string }
-     * Returns: { stdout, stderr, compileOutput, status }
-     */
     @Post('execute')
     async execute(@Body() body: { language: string; code: string; stdin?: string }) {
         const { language, code, stdin = '' } = body;
@@ -38,16 +29,14 @@ export class AppController {
         const languageId = LANGUAGE_IDS[language];
         if (!languageId) throw new BadRequestException(`Unsupported language: ${language}`);
 
-        const judge0Url = this.configService.get<string>('JUDGE0_URL');
-        if (!judge0Url) throw new InternalServerErrorException('JUDGE0_URL is not configured');
+        const executorUrl = this.configService.get<string>('JUDGE0_URL');
+        if (!executorUrl) throw new InternalServerErrorException('JUDGE0_URL is not configured');
 
         const response = await fetch(
-            `${judge0Url}/submissions?base64_encoded=false&wait=true`,
+            `${executorUrl}/submissions?wait=true`,
             {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     source_code: code,
                     language_id: languageId,
@@ -57,7 +46,7 @@ export class AppController {
         );
 
         if (!response.ok) {
-            throw new InternalServerErrorException(`Judge0 returned ${response.status}`);
+            throw new InternalServerErrorException(`Code executor returned ${response.status}`);
         }
 
         const data = await response.json();
