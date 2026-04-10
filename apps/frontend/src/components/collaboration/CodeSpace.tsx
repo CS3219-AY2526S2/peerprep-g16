@@ -190,13 +190,14 @@ export default function CodeSpace({
     const [partnerCursor, setPartnerCursor] = useState<{ line: number; col: number } | null>(null);
     const hasServerCode = useRef(false);
 
-    // Auto-generate boilerplate when question loads, but only if no code was saved server-side
+    // Auto-generate boilerplate when question loads, but only if no code was saved server-side.
+    // Only update local state — never emit codeUpdate here, as the socket may buffer the message
+    // and send it after connecting, overwriting the saved code on the server.
     useEffect(() => {
         if (!questionId || testCases.length === 0) return;
         if (hasServerCode.current) return;
         const generated = generateStarterCode(questionId, testCases, language);
         setCode(generated);
-        socket?.emit("codeUpdate", { sessionId, userId, code: generated, language });
     }, [questionId, testCases]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
