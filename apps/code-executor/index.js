@@ -81,7 +81,15 @@ app.post('/submissions', async (req, res) => {
 
 function runProcess(cmd, args, stdin, cwd) {
     return new Promise((resolve) => {
-        const child = spawn(cmd, args, { cwd, env: { ...process.env, NODE_PATH: '' } });
+        const child = spawn(cmd, args, {
+            cwd,
+            env: {
+                PATH: process.env.PATH,
+                HOME: process.env.HOME ?? '/tmp',
+                TMPDIR: process.env.TMPDIR ?? '/tmp',
+                NODE_PATH: '',
+            },
+        });
         let stdout = '', stderr = '';
 
         if (stdin) child.stdin.write(stdin);
