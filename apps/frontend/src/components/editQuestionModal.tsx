@@ -18,6 +18,9 @@ interface EditQuestion {
         sample: TestCase[];
         hidden: TestCase[];
     };
+    modelAnswer: string;
+    modelAnswerTimeComplexity: string;
+    modelAnswerExplanation: string;
     // Add other fields as needed
 }
 
@@ -40,6 +43,12 @@ interface EditQuestionModalProps {
     editHiddenOutput: string;
     setEditHiddenOutput: (v: string) => void;
     handleEditQuestion: () => void;
+    modelAnswer: string;
+    setModelAnswer: (v: string) => void;
+    modelAnswerTimeComplexity: string;
+    setModelAnswerTimeComplexity: (v: string) => void;
+    modelAnswerExplanation: string;
+    setModelAnswerExplanation: (v: string) => void;
     questionError?: string;
     onClose: () => void;
 }
@@ -55,6 +64,9 @@ function EditQuestionModal({
     editSampleOutput, setEditSampleOutput,
     editHiddenInput, setEditHiddenInput,
     editHiddenOutput, setEditHiddenOutput,
+    modelAnswer, setModelAnswer,
+    modelAnswerTimeComplexity, setModelAnswerTimeComplexity,
+    modelAnswerExplanation, setModelAnswerExplanation,
     handleEditQuestion,
     questionError,
     onClose
@@ -243,7 +255,9 @@ function EditQuestionModal({
                     <label style={styles.modalLabel}>
                         Hidden Test Cases: <span style={{ color: "red" }}>*</span>
                         <div style={{ display: "flex", gap: "8px" }}>
-                            <input type="text" value={editHiddenInput}
+                            <input
+                                type="text" 
+                                value={editHiddenInput}
                                 onChange={(e) => setEditHiddenInput(e.target.value)}
                                 style={{ ...styles.modalInput, flex: 1 }}
                                 placeholder="Input" />
@@ -266,6 +280,34 @@ function EditQuestionModal({
                                     style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
                             </div>
                         ))}
+                    </label>
+
+                    <label style={styles.modalLabel}>
+                        Model Answer:
+                        <textarea
+                            value={editQuestion.modelAnswer}
+                            onChange={(e) => setEditQuestion({ ...editQuestion, modelAnswer: e.target.value })}
+                            style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }}
+                        />
+                    </label>
+
+                    <label style={styles.modalLabel}>
+                        Model Answer Time Complexity:
+                        <input
+                            type="text"
+                            value={editQuestion.modelAnswerTimeComplexity}
+                            onChange={(e) => setEditQuestion({ ...editQuestion, modelAnswerTimeComplexity: e.target.value })}
+                            style={styles.modalInput}
+                        />
+                    </label>
+
+                    <label style={styles.modalLabel}>
+                        Model Answer Explanation:
+                        <textarea
+                            value={editQuestion.modelAnswerExplanation}
+                            onChange={(e) => setEditQuestion({ ...editQuestion, modelAnswerExplanation: e.target.value })}
+                            style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }}
+                        />
                     </label>
 
                     {questionError && <p style={{ color: "red", marginBottom: "10px" }}>{questionError}</p>}

@@ -4,8 +4,9 @@ import api from "../api/axiosInstance"
 import UserTable from "../components/userTable";
 import QuestionTable from "../components/questionTable";
 import AddQuestionModal from "../components/addQuestionModal";
-import EditQuestionModal from "../components/editQuestionModale";
+import EditQuestionModal from "../components/editQuestionModal";
 import styles from "../components/styles";
+import UploadJSONFile from "../components/uploadJSONFile";
 
 
 function AdminPage() {
@@ -26,6 +27,10 @@ function AdminPage() {
     const [questions, setQuestions] = useState<any[]>([]);
     const [filterDifficulty, setFilterDifficulty] = useState("all");
     const [showAddQuestion, setShowAddQuestion] = useState(false);
+    const [showJSONUpload, setShowJSONUpload] = useState(false);
+    const [modelAnswer, setModelAnswer] = useState("");
+    const [modelAnswerTimeComplexity, setModelAnswerTimeComplexity] = useState("");
+    const [modelAnswerExplanation, setModelAnswerExplanation] = useState("");
     const [newQuestion, setNewQuestion] = useState({
         questionId: "",
         title: "",
@@ -38,7 +43,10 @@ function AdminPage() {
         testCases: {
             sample: [] as { input: any; expectedOutput: any }[],
             hidden: [] as { input: any; expectedOutput: any }[]
-        }
+        },
+        modelAnswer: "",
+        modelAnswerTimeComplexity: "",
+        modelAnswerExplanation: ""
     });
     const [topicInput, setTopicInput] = useState("");
     const [editTopicInput, setEditTopicInput] = useState("");
@@ -58,6 +66,9 @@ function AdminPage() {
     const [editHiddenOutput, setEditHiddenOutput] = useState("");
     const [showTopicDropdown, setShowTopicDropdown] = useState(false);
     const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+    const [editModelAnswer, setEditModelAnswer] = useState("");
+    const [editModelAnswerTimeComplexity, setEditModelAnswerTimeComplexity] = useState("");
+    const [editModelAnswerExplanation, setEditModelAnswerExplanation] = useState("");
 
     useEffect(() => {
         fetchUsers();
@@ -214,12 +225,61 @@ function AdminPage() {
             );
             setQuestionSuccess("Question added successfully!");
             setShowAddQuestion(false);
-            setNewQuestion({ questionId: "", title: "", topic: [], difficulty: "", description: "", constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [] } });
+            setNewQuestion({
+                questionId: "", title: "", topic: [], difficulty: "", description: "",
+                constraints: [], examples: [], hints: [], testCases: { sample: [], hidden: [] },
+                modelAnswer: "", modelAnswerTimeComplexity: "", modelAnswerExplanation: ""
+            });
             fetchQuestions();
             setQuestionError("");
         } catch (error: any) {
             setQuestionError(error.response?.data?.message || "Failed to add question.");
         }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const text = await file.text();
+            const parsed = JSON.parse(text);
+
+            const questionsToUpload = Array.isArray(parsed) ? parsed : [parsed];
+
+            let successCount = 0;
+            const failedQuestions: string[] = [];
+
+            for (const q of questionsToUpload) {
+                try {
+                    await api.post("http://localhost:3002/questions", q, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                    successCount++;
+                } catch {
+                    const label = q.title ? `"${q.title}" (${q.questionId})` : q.questionId ?? "Unknown";
+                    failedQuestions.push(label);
+                }
+            }
+
+            if (failedQuestions.length === 0) {
+                setQuestionSuccess(`Uploaded ${successCount} question(s) successfully!`);
+                setQuestionError("");
+            } else if (successCount === 0) {
+                setQuestionError(`All questions failed to upload:\n${failedQuestions.join("\n")}`);
+                setQuestionSuccess("");
+            } else {
+                setQuestionError(`${successCount} uploaded, ${failedQuestions.length} failed:\n${failedQuestions.join("\n")}`);
+                setQuestionSuccess("");
+            }
+
+            fetchQuestions();
+        } catch {
+            setQuestionError("Invalid file format. Please upload a valid JSON file.");
+            setQuestionSuccess("");
+        }
+
+        e.target.value = '';
     };
 
     const handleEditQuestion = async () => {
@@ -293,6 +353,7 @@ function AdminPage() {
                     setShowAddQuestion={setShowAddQuestion}
                     questionSuccess={questionSuccess}
                     questionError={questionError}
+                    setShowJSONUpload={setShowJSONUpload}
                 />
                 }
             </div >
@@ -317,10 +378,29 @@ function AdminPage() {
                     setHiddenOutput={setHiddenOutput}
                     handleAddQuestion={handleAddQuestion}
                     questionError={questionError}
+                    modelAnswer={modelAnswer}
+                    setModelAnswer={setModelAnswer}
+                    modelAnswerTimeComplexity={modelAnswerTimeComplexity}
+                    setModelAnswerTimeComplexity={setModelAnswerTimeComplexity}
+                    modelAnswerExplanation={modelAnswerExplanation}
+                    setModelAnswerExplanation={setModelAnswerExplanation}
                     onClose={() => setShowAddQuestion(false)
                     }
                 />
             }
+            {showJSONUpload && (
+                <UploadJSONFile
+                    show={showJSONUpload}
+                    onClose={() => {
+                        setShowJSONUpload(false);
+                        setQuestionError("");
+                        setQuestionSuccess("");
+                    }}
+                    onUpload={handleFileUpload}
+                    questionError={questionError}
+                    questionSuccess={questionSuccess}
+                />
+            )}
             {showEditQuestion && editQuestion &&
                 <EditQuestionModal
                     show={showEditQuestion}
@@ -340,6 +420,12 @@ function AdminPage() {
                     setEditHiddenInput={setEditHiddenInput}
                     editHiddenOutput={editHiddenOutput}
                     setEditHiddenOutput={setEditHiddenOutput}
+                    modelAnswer={editModelAnswer}
+                    setModelAnswer={setEditModelAnswer}
+                    modelAnswerTimeComplexity={editModelAnswerTimeComplexity}
+                    setModelAnswerTimeComplexity={setEditModelAnswerTimeComplexity}
+                    modelAnswerExplanation={editModelAnswerExplanation}
+                    setModelAnswerExplanation={setEditModelAnswerExplanation}
                     handleEditQuestion={handleEditQuestion}
                     questionError={questionError}
                     onClose={() => {

@@ -21,9 +21,13 @@ interface QuestionTableProps {
     setShowAddQuestion: (v: boolean) => void;
     questionSuccess: string;
     questionError: string;
+    setShowJSONUpload: (v: boolean) => void;    
 }
 
-function QuestionTable({ questions, filteredQuestions, questionSearchQuery, setQuestionSearchQuery, filterTopic, setFilterTopic, filterDifficulty, setFilterDifficulty, sortField, sortOrder, handleSort, handleDeleteQuestion, setEditQuestion, setShowEditQuestion, setQuestionError, setShowAddQuestion, questionSuccess, questionError }: QuestionTableProps) {
+function QuestionTable({ questions, filteredQuestions, questionSearchQuery, setQuestionSearchQuery,
+    filterTopic, setFilterTopic, filterDifficulty, setFilterDifficulty, sortField, sortOrder, handleSort,
+    handleDeleteQuestion, setEditQuestion, setShowEditQuestion, setQuestionError, setShowAddQuestion,
+     questionSuccess, questionError, setShowJSONUpload }: QuestionTableProps) {
     const navigate = useNavigate();
     return (
         <>
@@ -68,6 +72,11 @@ function QuestionTable({ questions, filteredQuestions, questionSearchQuery, setQ
                     style={{ ...styles.addQuestionButton, marginLeft: "auto" }}>
                     + Add Question
                 </button>
+                <button
+                onClick={() => { setShowJSONUpload(true); setQuestionError(""); }}
+                    style={{ ...styles.addQuestionButton, marginLeft: "10px" }}>
+                    Upload JSON
+                </button >
             </div>
 
             <table style={styles.table}>
