@@ -7,6 +7,7 @@ import Homepage from "./pages/homepage"
 import AdminPage from "./pages/adminPage"
 import Profile from "./pages/profile"
 import Collaboration from './pages/collaboration'
+import ModelAnswer from "./pages/modelAnswer";
 import api from "./api/axiosInstance";
 import webStyles from './components/styles'
 
@@ -191,6 +192,13 @@ function Appcontent() {
                     </ProtectedUserRoute>
                 }
                 />
+                <Route path="/modelSolution/:questionId" element={
+                    <ProtectedUserRoute>
+                        <ModelAnswer />
+                    </ProtectedUserRoute>
+                }
+                />
+
                 <Route path="*" element={<Navigate to="/" replace />} /> {/*for unknown URL, it will redirect to login page*/}
             </Routes>
         </div>

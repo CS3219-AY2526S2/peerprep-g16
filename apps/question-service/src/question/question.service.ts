@@ -18,7 +18,7 @@ export class QuestionService {
   constructor(
     @InjectModel(Question.name)
     private readonly questionModel: Model<QuestionDocument>,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all questions matching the optional topic and difficulty filters.
@@ -189,4 +189,17 @@ export class QuestionService {
     const randomIndex = Math.floor(Math.random() * questions.length);
     return questions[randomIndex];
   }
+
+  async findModelAnswer(questionId: string) {
+    const result = await this.questionModel
+      .findOne({ questionId })
+      .select('modelAnswer modelAnswerTimeComplexity modelAnswerExplanation -_id')
+      .lean()
+      .exec();
+
+    if (!result) throw new NotFoundException(`Question ${questionId} not found`);
+    return result;
+  }
 }
+
+
