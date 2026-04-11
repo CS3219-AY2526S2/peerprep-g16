@@ -29,8 +29,8 @@ export class AppController {
         const languageId = LANGUAGE_IDS[language];
         if (!languageId) throw new BadRequestException(`Unsupported language: ${language}`);
 
-        const executorUrl = this.configService.get<string>('JUDGE0_URL');
-        if (!executorUrl) throw new InternalServerErrorException('JUDGE0_URL is not configured');
+        const executorUrl = this.configService.get<string>('CODE_EXECUTOR_URL');
+        if (!executorUrl) throw new InternalServerErrorException('CODE_EXECUTOR_URL is not configured');
 
         const response = await fetch(
             `${executorUrl}/submissions?wait=true`,
