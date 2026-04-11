@@ -7,26 +7,31 @@ export class MatchController {
   constructor(
     private readonly matchService: MatchService,
     private readonly redisService: RedisService,
-  ) {}
-    @Post()
-    async joinQueue(@Body() body: any) {
-        const { userId, username, topic, difficulty } = body;
-        if (!userId || !username || !topic) {
-            return { message: 'userId, username and topic are required' };
-        }
-        return await this.matchService.joinQueue(userId, username, topic, difficulty);
+  ) { }
+  @Post()
+  async joinQueue(@Body() body: any) {
+    const { userId, username, topic, difficulty } = body;
+    if (!userId || !username || !topic) {
+      return { message: 'userId, username and topic are required' };
     }
+    return await this.matchService.joinQueue(userId, username, topic, difficulty);
+  }
 
-    @Get(':userId')
-    async getStatus(@Param('userId') userId: string) {
-        return await this.matchService.getQueueStatus(userId);
-    }
+  @Get('peek/:userId')
+  async peekStatus(@Param('userId') userId: string) {
+    return await this.matchService.peekQueueStatus(userId);
+  }
 
-    @Delete(':userId')
-    async leaveQueue(@Param('userId') userId: string) {
-        await this.matchService.leaveQueue(userId);
-        return { message: 'Left queue successfully' };
-    }
+  @Get(':userId')
+  async getStatus(@Param('userId') userId: string) {
+    return await this.matchService.getQueueStatus(userId);
+  }
+
+  @Delete(':userId')
+  async leaveQueue(@Param('userId') userId: string) {
+    await this.matchService.leaveQueue(userId);
+    return { message: 'Left queue successfully' };
+  }
 
   /**
    * GET /api/match/health

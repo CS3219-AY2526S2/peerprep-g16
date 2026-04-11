@@ -80,30 +80,24 @@ function Homepage() {
 
         const checkExistingQueue = async () => {
             try {
-                const response = await api.get(`http://localhost:3004/api/match/${user.id}`);
+                // Use peek — never deletes or consumes match state
+                const response = await api.get(`http://localhost:3004/api/match/peek/${user.id}`);
 
-                if (response.data.status === 'matched') {
-                    // Already matched before they refreshed
-                    handleMatchFound(response.data);
-                } else if (response.data.status === 'waiting' ||
+                if (response.data.status === 'waiting' ||
                     response.data.status === 'expand_search_difficulty') {
-                    // Still in queue — restore the overlay
                     const userData = response.data.preferences;
                     if (userData?.topic) setTopic(userData.topic);
                     if (userData?.difficulty) setDifficulty(userData.difficulty);
                     setIsMatchmaking(true);
                     setMatchStatus(response.data.message || "Searching for a match...");
-                    hasStartedRef.current = true; // prevent useEffect re-joining
+                    hasStartedRef.current = true;
                     startPolling(user.id);
-                    // Restore elapsed time if available
-                    if (response.data.elapsed) {
-                        setElapsed(Math.floor(response.data.elapsed / 1000));
-                        timerRef.current = setInterval(() => {
-                            setElapsed(prev => prev + 1);
-                        }, 1000);
-                    }
+                    setElapsed(response.data.elapsed ? Math.floor(response.data.elapsed / 1000) : 0);
+                    timerRef.current = setInterval(() => {
+                        setElapsed(prev => prev + 1);
+                    }, 1000);
                 }
-                // status === 'not_in_queue' → do nothing, normal page load
+                // not_in_queue → normal page load, do nothing
             } catch (err) {
                 console.error('Failed to check queue status on mount', err);
             }
@@ -174,6 +168,23 @@ function Homepage() {
     };
 
     const cancelMatchmaking = async () => {
+        const stored = localStorage.getItem("login");
+        const user = stored ? JSON.parse(stored) : null;
+        if (!user) return;
+
+        try {
+            // Check if already matched before allowing cancel
+            const statusResponse = await api.get(`http://localhost:3004/api/match/${user.id}`);
+            if (statusResponse.data.status === 'matched') {
+                // Already matched — redirect instead of cancelling
+                handleMatchFound(statusResponse.data);
+                return;
+            }
+        } catch (err) {
+            console.error(err);
+        }
+
+        // Not matched — proceed with cancel
         stopAll();
         hasStartedRef.current = false;
         isMatchedRef.current = false;
@@ -181,8 +192,6 @@ function Homepage() {
         setElapsed(0);
         setIsTimeout(false);
 
-        const stored = localStorage.getItem("login");
-        const user = stored ? JSON.parse(stored) : null;
         if (user) {
             try {
                 await api.delete(`http://localhost:3004/api/match/${user.id}`);
@@ -198,9 +207,9 @@ function Homepage() {
                 clearInterval(pollRef.current);
                 return;
             }
+
             try {
                 const statusResponse = await api.get(`http://localhost:3004/api/match/${userId}`);
-
                 if (statusResponse.data.status === "matched") {
                     handleMatchFound(statusResponse.data);
                 } else if (statusResponse.data.status === "expand_search_difficulty") {
@@ -287,6 +296,7 @@ function Homepage() {
                             setIsTimeout(false);
                             setElapsed(0);
                         }}
+                        isRedirecting={matchStatus === "Match found! Redirecting..."}  // ← ADD
                     />
                 )}
 

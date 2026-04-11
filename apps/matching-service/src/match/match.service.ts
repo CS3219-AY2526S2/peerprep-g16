@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 const QUEUE_KEY = 'matchmaking:queue';
 const STAGE1_TIMEOUT = 60000;
 const STAGE2_TIMEOUT = 120000;
-const DIFFICULTY_RANK = {
+const DIFFICULTY_RANK: { [key: string]: number } = {
     easy: 1,
     medium: 2,
     hard: 3,
@@ -243,11 +243,28 @@ export class MatchService {
             preferences: { topic: userData.topic, difficulty: userData.difficulty }
         };
     }
+    
+    //check if the user was previously in queue before disconnecting
+    async peekQueueStatus(userId: string) {
+    const userData = await this.client.hgetall(`user:${userId}`);
+    
+    if (!userData || !userData.userId) {
+        return { status: 'not_in_queue' };
+    }
+
+    const elapsed = Date.now() - parseInt(userData.joinedAt);
+
+    return {
+        status: elapsed >= STAGE1_TIMEOUT ? 'expand_search_difficulty' : 'waiting',
+        message: 'Searching for a match...',
+        elapsed,
+        preferences: { topic: userData.topic, difficulty: userData.difficulty }
+    };
+}
 
     async leaveQueue(userId: string) {
         await this.client.zrem(QUEUE_KEY, userId);
         await this.client.del(`user:${userId}`);
-        await this.client.del(`match:${userId}`);
     }
 
     /**
