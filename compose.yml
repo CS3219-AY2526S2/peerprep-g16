@@ -142,6 +142,8 @@ services:
     restart: unless-stopped
     ports:
       - "2358:2358"
+    mem_limit: 512m
+    cpus: "1.0"
     networks:
       - peerprep-network
 
