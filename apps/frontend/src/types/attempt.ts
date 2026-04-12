@@ -5,5 +5,14 @@ export type Attempt = {
   topic: string[];
   difficulty: "Easy" | "Medium" | "Hard";
   collaborationSessionId?: string;
+  language?: string;
+  hintsUsed?: number;
+  testCasesPassed?: number;
+  duration?: number;
+  whiteboardScreenshot?: {
+    type: "Buffer";
+    data: number[];
+  };
   attemptedAt: string;
 };
+

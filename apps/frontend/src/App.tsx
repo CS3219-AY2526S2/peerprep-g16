@@ -18,6 +18,7 @@ import Collaboration from "./pages/collaboration";
 import api from "./api/axiosInstance";
 import webStyles from "./components/styles";
 import History from "./pages/history";
+import AttemptReview from "./pages/attemptReview";
 
 function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
   const stored = localStorage.getItem("login");
@@ -242,6 +243,14 @@ function Appcontent() {
           element={
             <ProtectedUserRoute>
               <Collaboration />
+            </ProtectedUserRoute>
+          }
+        />
+        <Route
+          path="/history/:attemptId"
+          element={
+            <ProtectedUserRoute>
+              <AttemptReview />
             </ProtectedUserRoute>
           }
         />

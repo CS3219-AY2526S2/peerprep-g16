@@ -87,8 +87,7 @@ function History() {
   }, [filteredAttempts, currentPage, pageSize]);
 
   const handleOpenAttempt = (attempt: Attempt) => {
-    if (!attempt.collaborationSessionId) return;
-    navigate(`/collaboration/${attempt.collaborationSessionId}`);
+    navigate(`/history/${attempt._id}`);
   };
 
   return (
@@ -164,13 +163,9 @@ function History() {
                       <button
                         type="button"
                         onClick={() => handleOpenAttempt(attempt)}
-                        disabled={!attempt.collaborationSessionId}
                         style={{
                           ...styles.titleButton,
-                          opacity: attempt.collaborationSessionId ? 1 : 0.5,
-                          cursor: attempt.collaborationSessionId
-                            ? "pointer"
-                            : "not-allowed",
+                          cursor: "pointer",
                         }}
                       >
                         {attempt.questionTitle}
