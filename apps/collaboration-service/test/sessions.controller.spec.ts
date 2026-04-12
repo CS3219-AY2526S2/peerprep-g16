@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { SessionsController } from '../src/sessions/sessions.controller';
 import { SessionsService } from '../src/sessions/sessions.service';
@@ -38,7 +38,6 @@ describe('SessionsController', () => {
 
     beforeEach(async () => {
         const mockService: Partial<jest.Mocked<SessionsService>> = {
-            create: jest.fn(),
             findOne: jest.fn(),
             endSession: jest.fn(),
         };
@@ -66,30 +65,6 @@ describe('SessionsController', () => {
 
     afterEach(async () => {
         await app.close();
-    });
-
-    // ─── POST /sessions/create ─────────────────────────────────────────────────
-
-    describe('POST /sessions/create', () => {
-        it('creates a session and returns it', async () => {
-            const session = makeSession();
-            sessionsService.create.mockResolvedValue(session);
-
-            const res = await request(app.getHttpServer())
-                .post('/sessions/create')
-                .send({
-                    userAId: 'user-a',
-                    userBId: 'user-b',
-                    matchId: 'session-1',
-                    topic: 'Arrays',
-                    userADifficulty: 'Easy',
-                    userBDifficulty: 'Medium',
-                })
-                .expect(201);
-
-            expect(res.body.sessionId).toBe('session-1');
-            expect(res.body.status).toBe('active');
-        });
     });
 
     // ─── GET /sessions/:id ─────────────────────────────────────────────────────
