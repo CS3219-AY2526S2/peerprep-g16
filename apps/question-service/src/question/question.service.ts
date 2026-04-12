@@ -45,6 +45,27 @@ export class QuestionService {
   }
 
   /**
+   * Retrieves a single question by its stable questionId.
+   *
+   * This is used by attempt review pages to reconstruct the original problem
+   * statement for a saved attempt. The questionId is the human-readable stable
+   * identifier, such as "binary-search", not the MongoDB document _id.
+   *
+   * @param questionId Stable question identifier stored on the attempt record
+   * @returns Promise resolving to the matching question document
+   * @throws NotFoundException if no question exists with the given questionId
+   */
+  async findByQuestionId(questionId: string) {
+    const question = await this.questionModel.findOne({ questionId }).exec();
+
+    if (!question) {
+      throw new NotFoundException(`Question ${questionId} not found`);
+    }
+
+    return question;
+  }
+
+  /**
    * Creates and persists a new question in the database.
    *
    * @param createQuestionDto Request payload containing question data
