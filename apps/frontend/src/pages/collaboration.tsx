@@ -44,7 +44,35 @@ function Collaboration() {
     const [endSessionState, setEndSessionState] = useState<"idle" | "pending" | "declined">("idle");
     const [incomingEndRequest, setIncomingEndRequest] = useState(false);
     const [partnerOnline, setPartnerOnline] = useState<boolean | null>(null);
+    const [disconnectCountdown, setDisconnectCountdown] = useState<number | null>(null);
+    const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const whiteboardRef = useRef<WhiteboardHandle>(null);
+
+    // Start a 120s countdown when partner disconnects, clear it when they rejoin
+    useEffect(() => {
+        if (partnerOnline === false) {
+            setDisconnectCountdown(120);
+            countdownRef.current = setInterval(() => {
+                setDisconnectCountdown(prev => {
+                    if (prev === null || prev <= 1) {
+                        clearInterval(countdownRef.current!);
+                        countdownRef.current = null;
+                        return null;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else {
+            if (countdownRef.current) {
+                clearInterval(countdownRef.current);
+                countdownRef.current = null;
+            }
+            setDisconnectCountdown(null);
+        }
+        return () => {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+        };
+    }, [partnerOnline]);
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -217,7 +245,10 @@ function Collaboration() {
             {partnerOnline === false && (
                 <div style={styles.partnerDisconnectedBanner}>
                     <span style={{ fontSize: "14px" }}>
-                        ⚠️ Your partner has disconnected. Session will auto-close if they don't rejoin within 2 minutes.
+                        ⚠️ Your partner has disconnected.
+                        {disconnectCountdown !== null && (
+                            <> Session will auto-close in <strong>{Math.floor(disconnectCountdown / 60)}:{String(disconnectCountdown % 60).padStart(2, "0")}</strong>.</>
+                        )}
                     </span>
                 </div>
             )}
