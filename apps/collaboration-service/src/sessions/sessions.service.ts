@@ -407,9 +407,15 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         const room = io.sockets.adapter.rooms.get(sessionId);
         const remaining = room ? room.size : 0;
 
-        if (remaining > 0) return; // partner is still connected
+        // Start idle timer whenever at least one user has left (remaining < 2).
+        // This covers both: one user leaves while the other stays, and both leave.
+        // We emit endSession:confirmed to whoever is still in the room (may be nobody).
+        if (remaining >= 2) return;
 
-        this.logger.log(`All users left session ${sessionId} — starting ${IDLE_TIMEOUT_MS / 1000}s idle timer`);
+        // Don't double-start if a timer is already running
+        if (this.idleTimers.has(sessionId)) return;
+
+        this.logger.log(`User left session ${sessionId} (${remaining} remaining) — starting ${IDLE_TIMEOUT_MS / 1000}s idle timer`);
         const timer = setTimeout(async () => {
             this.idleTimers.delete(sessionId);
             this.logger.log(`Idle timeout reached — auto-terminating session ${sessionId}`);

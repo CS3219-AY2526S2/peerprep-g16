@@ -57,7 +57,14 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
     }
 
     handleDisconnect(client: Socket) {
-        const { sessionId, userId } = client.data ?? {};
+        // client.data.sessionId is set in handleJoinSession. If the socket
+        // disconnects before joinSession fires (e.g. on a fast refresh),
+        // fall back to the rooms the socket was in.
+        const sessionId: string | undefined =
+            client.data?.sessionId ??
+            [...client.rooms].find(r => r !== client.id);
+        const userId: string | undefined = client.data?.userId;
+
         console.log(`Client disconnected: ${client.id}${sessionId ? ` (session ${sessionId})` : ''}`);
         if (sessionId) {
             client.to(sessionId).emit('partnerDisconnected', { userId });
