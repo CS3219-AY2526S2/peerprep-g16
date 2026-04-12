@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, NotFoundException, UseGuards, ForbiddenException, Req } from '@nestjs/common';
+import { Controller, Post, Get, Param, NotFoundException, UseGuards, ForbiddenException, Req } from '@nestjs/common';
 import { Request } from 'express';
 import { SessionsService } from './sessions.service';
 import { UserGuard } from '../auth/user.guard';
@@ -10,18 +10,6 @@ type AuthenticatedRequest = Request & {
 @Controller('sessions')
 export class SessionsController {
     constructor(private readonly sessionsService: SessionsService) {}
-
-    @Post('create')
-    async create(@Body() body: {
-        userAId: string;
-        userBId: string;
-        matchId: string;
-        topic: string;
-        userADifficulty: string;
-        userBDifficulty: string;
-    }) {
-        return this.sessionsService.create(body);
-    }
 
     @UseGuards(UserGuard)
     @Get(':id')

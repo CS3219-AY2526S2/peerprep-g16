@@ -166,11 +166,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     }
 
     /**
-     * Called by Question Service once it has selected a question for this session.
-     * Sets session status to 'active' and pushes 'questionReady' to both users.
-     *
-     * POST /sessions/:id/question
-     * Body: { question: Question }
+     * Attaches a question to the session and transitions status to 'active'.
+     * Called internally by fetchAndAttachQuestion (on success) and the
+     * question timeout fallback (getMockQuestion). Emits 'questionReady' to
+     * both users via the socket room.
      */
     async attachQuestion(sessionId: string, question: any): Promise<void> {
         const session = this.sessions.get(sessionId);
