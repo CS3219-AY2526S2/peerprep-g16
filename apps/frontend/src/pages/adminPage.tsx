@@ -69,7 +69,7 @@ function AdminPage() {
     const fetchUsers = React.useCallback(async () => {
         try {
             const response = await api.get("http://localhost:3001/users",
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setUsers(response.data.data);
         } catch (error: any) {
@@ -80,7 +80,7 @@ function AdminPage() {
     const fetchQuestions = React.useCallback(async () => {
         try {
             const response = await api.get("http://localhost:3002/questions",
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestions(response.data);
         } catch (error: any) {
@@ -110,9 +110,9 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to promote this user to admin?");
         if (!confirmed) return;
         try {
-            await api.patch(`[http://localhost:3001/users/](http://localhost:3001/users/)\${userId}/privilege`,
+            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
                 { isAdmin: true },
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setUserSuccess("User promoted to admin successfully!");
             await fetchUsers();
@@ -129,9 +129,9 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to demote this admin to user?");
         if (!confirmed) return;
         try {
-            await api.patch(`[http://localhost:3001/users/](http://localhost:3001/users/)\${userId}/privilege`,
+            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
                 { isAdmin: false },
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setUserSuccess("User demoted successfully!");
             await fetchUsers();
@@ -144,8 +144,8 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to delete this question?");
         if (!confirmed) return;
         try {
-            await api.delete(`[http://localhost:3002/questions/](http://localhost:3002/questions/)\${questionId}`,
-                { headers: { Authorization: `Bearer \${token}` } }
+            await api.delete(`http://localhost:3002/questions/${questionId}`,
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestionSuccess("Question deleted successfully!");
             await fetchQuestions();
@@ -188,9 +188,9 @@ function AdminPage() {
             return;
         }
         try {
-            await api.patch(`[http://localhost:3002/questions/](http://localhost:3002/questions/)\${editQuestion.questionId}`,
+            await api.patch(`http://localhost:3002/questions/${editQuestion.questionId}`,
                 editQuestion,
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestionSuccess("Question updated successfully!");
             setShowEditQuestion(false);
@@ -203,36 +203,47 @@ function AdminPage() {
 
     const handleReviewFeedback = React.useCallback(async (id: string) => {
         try {
-            await updateFeedback(id, { status: "reviewed" });
+            await api.patch(
+                `http://localhost:3002/feedback/${id}`,
+                { status: "reviewed" },
+                { headers: { Authorization: `Bearer \${token}` } }
+            );
             setFeedbackSuccess("Feedback marked as reviewed.");
             await fetchFeedback();
         } catch (error: any) {
             setFeedbackError("Failed to update feedback.");
         }
-    }, [fetchFeedback]);
+    }, [fetchFeedback, token]);
 
     const handleResolveFeedback = React.useCallback(async (id: string) => {
         try {
-            await updateFeedback(id, { status: "resolved" });
+            await api.patch(
+                `http://localhost:3002/feedback/${id}`,
+                { status: "resolved" },
+                { headers: { Authorization: `Bearer \${token}` } }
+            );
             setFeedbackSuccess("Feedback marked as resolved.");
             await fetchFeedback();
         } catch (error: any) {
             setFeedbackError("Failed to update feedback.");
         }
-    }, [fetchFeedback]);
+    }, [fetchFeedback, token]);
 
     const handleDeleteFeedback = React.useCallback(async (id: string) => {
         const confirmed = window.confirm("Are you sure you want to delete this feedback?");
         if (!confirmed) return;
 
         try {
-            await deleteFeedback(id);
+            await api.delete(
+                `http://localhost:3002/feedback/${id}`,
+                { headers: { Authorization: `Bearer \${token}` } }
+            );
             setFeedbackSuccess("Feedback deleted successfully.");
             await fetchFeedback();
         } catch (error: any) {
             setFeedbackError("Failed to delete feedback.");
         }
-    }, [fetchFeedback]);
+    }, [fetchFeedback, token]);
 
     const handleEditQuestionFromFeedback = React.useCallback((feedback: any) => {
         const fullQuestion = questions.find(

@@ -25,18 +25,18 @@ export const submitFeedback = async (body: {
 
 export const getMyOwnFeedback = async () => {
   const response = await api.get('http://localhost:3002/feedback/my');
-  return response.data;
+  return response.data;44
 };
 
 export const updateFeedback = async (
   id: string,
   body: { status?: string; adminNote?: string },
 ) => {
-  const response = await api.patch(`[http://localhost:3002/feedback/](http://localhost:3002/feedback/)\${id}`, body);
+  const response = await api.patch(`http://localhost:3002/feedback/${id}`, body);
   return response.data;
 };
 
 export const deleteFeedback = async (id: string) => {
-  const response = await api.delete(`[http://localhost:3002/feedback/](http://localhost:3002/feedback/)\${id}`);
+  const response = await api.delete(`http://localhost:3002/feedback/${id}`);
   return response.data;
 };

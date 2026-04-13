@@ -54,7 +54,7 @@ export class FeedbackService {
       .exec();
 
     if (!updated) {
-      throw new NotFoundException(`Feedback \${id} not found`);
+      throw new NotFoundException(`Feedback ${id} not found`);
     }
 
     return updated;
@@ -64,7 +64,7 @@ export class FeedbackService {
     const deleted = await this.feedbackModel.findByIdAndDelete(id).exec();
 
     if (!deleted) {
-      throw new NotFoundException(`Feedback \${id} not found`);
+      throw new NotFoundException(`Feedback ${id} not found`);
     }
 
     return deleted;
