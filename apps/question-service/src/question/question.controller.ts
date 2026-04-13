@@ -122,4 +122,9 @@ export class QuestionController {
   async findModelAnswer(@Param('questionId') questionId: string) {
     return this.questionService.findModelAnswer(questionId);
   }
+
+  @Get(':questionId/description')
+  async findQuestionDescription(@Param('questionId') questionId: string) {
+    return this.questionService.findQuestionDescription(questionId);
+  }
 }

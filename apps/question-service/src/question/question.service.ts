@@ -200,6 +200,17 @@ export class QuestionService {
     if (!result) throw new NotFoundException(`Question ${questionId} not found`);
     return result;
   }
+
+  async findQuestionDescription(questionId: string) {
+    const result = await this.questionModel
+      .findOne({ questionId })
+      .select('description -_id')
+      .lean()
+      .exec();
+
+    if (!result) throw new NotFoundException(`Question ${questionId} not found`);
+    return result;
+  }
 }
 
 

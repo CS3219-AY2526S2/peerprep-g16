@@ -11,6 +11,7 @@ function ModelAnswer() {
         modelAnswerTimeComplexity: string;
         modelAnswerExplanation: string;
     } | null>(null);
+    const [questionDescription, setQuestionDescription] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -18,7 +19,7 @@ function ModelAnswer() {
             navigate("/homepage", { replace: true });
             return;
         }
-        const load = async () => {
+        const loadModelAnswer = async () => {
             try {
                 const res = await api.get(`http://localhost:3002/questions/${questionId}/model-answer`);
                 setData(res.data);
@@ -28,7 +29,16 @@ function ModelAnswer() {
                 setLoading(false);
             }
         };
-        load();
+        const loadQuestionDescription = async () => {
+            try {
+                const res = await api.get(`http://localhost:3002/questions/${questionId}/description`);
+                setQuestionDescription(res.data.description);
+            } catch {
+                setQuestionDescription(null);
+            }
+        };
+        loadModelAnswer();
+        loadQuestionDescription();
     }, [questionId, navigate]);
 
     if (loading) return <div style={styles.page}>Loading...</div>;
@@ -38,6 +48,9 @@ function ModelAnswer() {
         <div style={styles.page}>
 
             <h2>Model Answer</h2>
+
+            <h3 style={styles.sectionTitle}>Question:</h3>
+            <p>{questionDescription}</p>
 
             <h3 style={styles.sectionTitle}>Answer:</h3>
             <p>{data.modelAnswer}</p>
