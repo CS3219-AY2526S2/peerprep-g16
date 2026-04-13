@@ -171,6 +171,9 @@ function Homepage() {
         isMatchedRef.current = true;
         stopAll();
         setMatchStatus("Match found! Redirecting...");
+        if (data.matchedWith?.username) {
+            localStorage.setItem(`peer:${data.roomId}`, data.matchedWith.username);
+        }
         setTimeout(() => {
             setIsMatchmaking(false);
             navigate(`/collaboration/${data.roomId}`);
