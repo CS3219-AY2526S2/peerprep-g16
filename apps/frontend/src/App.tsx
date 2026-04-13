@@ -74,11 +74,10 @@ function Appcontent() {
     const login = async (event: any) => {
         event.preventDefault();
         try {
-            const response = await api.post("http://localhost:3001/auth/login", {
+            const response = await api.post(`${import.meta.env.VITE_USER_SERVICE_URL}/auth/login`, {
                 email,
                 password,
             });
-
             console.log("response", response);
             localStorage.setItem(
                 "login",

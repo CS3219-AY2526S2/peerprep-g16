@@ -166,7 +166,7 @@ async function executeCode(
     code: string,
     stdin: string,
 ): Promise<{ stdout: string; stderr: string }> {
-    const res = await fetch("http://localhost:3003/execute", {
+    const res = await fetch(`${import.meta.env.VITE_COLLABORATION_SERVICE_URL}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ language, code, stdin }),

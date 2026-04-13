@@ -3,6 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
 import styles from "../components/styles";
 
+const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
+
 function Register() {
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
@@ -18,7 +20,7 @@ function Register() {
         else if (!handleConfirmPasswordValidation()) return
 
         try {
-            await api.post('http://localhost:3001/users', {
+            await api.post(`${USER_SERVICE_URL}/users`, {
                 username,
                 email,
                 password,

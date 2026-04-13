@@ -7,6 +7,9 @@ import AddQuestionModal from "../components/addQuestionModal";
 import EditQuestionModal from "../components/editQuestionModale";
 import styles from "../components/styles";
 
+const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
+const QUESTION_SERVICE_URL = import.meta.env.VITE_QUESTION_SERVICE_URL as string;
+
 
 function AdminPage() {
     const stored = localStorage.getItem("login");
@@ -93,7 +96,7 @@ function AdminPage() {
 
     const fetchUsers = async () => {
         try {
-            const response = await api.get("http://localhost:3001/users",
+            const response = await api.get(`${USER_SERVICE_URL}/users`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setUsers(response.data.data);
@@ -106,7 +109,7 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to promote this user to admin?");
         if (!confirmed) return;
         try {
-            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
+            await api.patch(`${USER_SERVICE_URL}/users/${userId}/privilege`,
                 { isAdmin: true },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -125,7 +128,7 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to demote this admin to user?");
         if (!confirmed) return;
         try {
-            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
+            await api.patch(`${USER_SERVICE_URL}/users/${userId}/privilege`,
                 { isAdmin: false },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -156,7 +159,7 @@ function AdminPage() {
 
     const fetchQuestions = async () => {
         try {
-            const response = await api.get("http://localhost:3002/questions",
+            const response = await api.get(`${QUESTION_SERVICE_URL}/questions`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestions(response.data);
@@ -188,7 +191,7 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to delete this question?");
         if (!confirmed) return;
         try {
-            await api.delete(`http://localhost:3002/questions/${questionId}`,
+            await api.delete(`${QUESTION_SERVICE_URL}/questions/${questionId}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestionSuccess("Question deleted successfully!");
@@ -208,7 +211,7 @@ function AdminPage() {
             return;
         }
         try {
-            await api.post("http://localhost:3002/questions",
+            await api.post(`${QUESTION_SERVICE_URL}/questions`,
                 newQuestion,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -232,7 +235,7 @@ function AdminPage() {
             return;
         }
         try {
-            await api.patch(`http://localhost:3002/questions/${editQuestion.questionId}`,
+            await api.patch(`${QUESTION_SERVICE_URL}/questions/${editQuestion.questionId}`,
                 editQuestion,
                 { headers: { Authorization: `Bearer ${token}` } }
             );

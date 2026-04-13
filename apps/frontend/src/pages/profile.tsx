@@ -4,6 +4,8 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
 import styles from "../components/styles";
 
+const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
+
 function Profile() {
     const stored = localStorage.getItem("login");
     const user = stored ? JSON.parse(stored) : null;
@@ -29,7 +31,7 @@ function Profile() {
         else if (!handleEmailValidation()) return
 
         try {
-            await api.patch(`http://localhost:3001/users/${user?.id}`,
+            await api.patch(`${USER_SERVICE_URL}/users/${user?.id}`,
                 { email: newEmail },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
@@ -68,7 +70,7 @@ function Profile() {
         else if (!handleConfirmPasswordValidation()) return
 
         try {
-            await api.patch(`http://localhost:3001/users/${user?.id}`,
+            await api.patch(`${USER_SERVICE_URL}/users/${user?.id}`,
                 { password: newPassword, currentPassword: currentPassword },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
@@ -136,7 +138,7 @@ function Profile() {
         if (!usernameChange()) return
 
         try {
-            await api.patch(`http://localhost:3001/users/${user?.id}`,
+            await api.patch(`${USER_SERVICE_URL}/users/${user?.id}`,
                 { username: newUsername },
                 { headers: { Authorization: `Bearer ${token}` } }
             )
@@ -171,7 +173,7 @@ function Profile() {
         if (!confirmed) return;
 
         try {
-            await api.delete(`http://localhost:3001/users/${user?.id}`,
+            await api.delete(`${USER_SERVICE_URL}/users/${user?.id}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             )
             localStorage.removeItem("login");
