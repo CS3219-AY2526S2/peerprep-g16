@@ -166,7 +166,7 @@ function AdminPage() {
         try {
             await api.post("http://localhost:3002/questions",
                 newQuestion,
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestionSuccess("Question added successfully!");
             setShowAddQuestion(false);
@@ -206,7 +206,7 @@ function AdminPage() {
             await api.patch(
                 `http://localhost:3002/feedback/${id}`,
                 { status: "reviewed" },
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setFeedbackSuccess("Feedback marked as reviewed.");
             await fetchFeedback();
@@ -220,7 +220,7 @@ function AdminPage() {
             await api.patch(
                 `http://localhost:3002/feedback/${id}`,
                 { status: "resolved" },
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setFeedbackSuccess("Feedback marked as resolved.");
             await fetchFeedback();
@@ -236,7 +236,7 @@ function AdminPage() {
         try {
             await api.delete(
                 `http://localhost:3002/feedback/${id}`,
-                { headers: { Authorization: `Bearer \${token}` } }
+                { headers: { Authorization: `Bearer ${token}` } }
             );
             setFeedbackSuccess("Feedback deleted successfully.");
             await fetchFeedback();
