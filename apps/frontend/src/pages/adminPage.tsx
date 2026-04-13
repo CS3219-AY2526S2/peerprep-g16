@@ -110,7 +110,7 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to promote this user to admin?");
         if (!confirmed) return;
         try {
-            await api.patch(`[http://localhost:3001/users/](http://localhost:3001/users/)\${userId}/privilege`,
+            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
                 { isAdmin: true },
                 { headers: { Authorization: `Bearer \${token}` } }
             );
