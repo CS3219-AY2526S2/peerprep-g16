@@ -135,6 +135,7 @@ services:
   # Code Executor (custom, ARM64-native) — Port 2358
   # ============================================
   code-executor:
+    runtime: ${CONTAINER_RUNTIME:-runc}
     build:
       context: ./apps/code-executor
       dockerfile: Dockerfile
