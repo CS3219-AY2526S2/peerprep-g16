@@ -46,6 +46,7 @@ function Collaboration() {
     const [partnerOnline, setPartnerOnline] = useState<boolean | null>(null);
     const [disconnectCountdown, setDisconnectCountdown] = useState<number | null>(null);
     const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const peerUsername = matchingId ? localStorage.getItem(`peer:${matchingId}`) : null;
     const whiteboardRef = useRef<WhiteboardHandle>(null);
 
     // Start a 120s countdown when partner disconnects, clear it when they rejoin
@@ -91,6 +92,7 @@ function Collaboration() {
                         setIsLoading(false);
                     }
                 }
+
 
                 const connectedSocket = connectSocket();
                 setSocket(connectedSocket);
@@ -226,6 +228,13 @@ function Collaboration() {
                     <span style={styles.sessionText}>{connectionState}</span>
                 </div>
 
+                {peerUsername && (
+                    <div style={styles.peerBadge}>
+                        <span style={{ fontSize: "11px", color: "#868e96" }}>Your peer:</span>
+                        <span style={{ fontSize: "12px", fontWeight: 600, color: "#f4a261" }}>{peerUsername}</span>
+                    </div>
+                )}
+
                 <VoiceCall socket={socket} sessionId={matchingId} />
 
                 <button
@@ -357,10 +366,15 @@ const COLORS: Record<string, string> = {
 };
 
 const styles: Record<string, CSSProperties> = {
-    page: { minHeight: "100vh", background: "#f5f4f2", display: "flex", flexDirection: "column" },
+    page: { height: "100vh", overflow: "hidden", background: "#f5f4f2", display: "flex", flexDirection: "column" },
     header: {
+        position: "sticky" as const, top: 0, zIndex: 100,
         marginTop: "55px", padding: "14px 28px", background: "#1a1a2e",
         display: "flex", alignItems: "center", gap: "16px", boxShadow: "0 2px 12px rgba(0,0,0,0.15)",
+    },
+    peerBadge: {
+        display: "flex", alignItems: "center", gap: "6px",
+        padding: "5px 12px", background: "#2a2a4e", borderRadius: "8px",
     },
     panelToggle: {
         marginLeft: "auto", display: "flex", background: "#2a2a4e",
@@ -383,7 +397,7 @@ const styles: Record<string, CSSProperties> = {
     sessionText: { color: "#a9b1d6", fontSize: "12px", textTransform: "capitalize" },
     layoutGrid: {
         flex: 1, display: "grid", gridTemplateColumns: "340px 1fr",
-        gap: "0", minHeight: 0, height: "calc(100vh - 60px)",
+        gap: "0", minHeight: 0, overflow: "hidden",
     },
     questionColumn: {
         padding: "20px 16px", background: "#fff", borderRight: "1px solid #e9ecef",
@@ -403,8 +417,8 @@ const styles: Record<string, CSSProperties> = {
     constraintsList: { margin: 0, paddingLeft: "16px", lineHeight: "1.8" },
     constraint: { fontFamily: "monospace" },
     rightColumn: { padding: "20px", display: "flex", gap: "16px", overflow: "hidden", height: "100%" },
-    whiteboard: { minWidth: 0, height: 1000, transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
-    codeSpace: { minWidth: 0, transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
+    whiteboard: { minWidth: 0, minHeight: 0, overflow: "hidden", transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
+    codeSpace: { minWidth: 0, minHeight: 0, overflow: "hidden", transition: "flex 0.3s ease", display: "flex", flexDirection: "column" },
     partnerDisconnectedBanner: {
         display: "flex", alignItems: "center", gap: "12px", padding: "10px 28px",
         background: "#2a2a4e", color: "#f4a261", borderBottom: "1px solid #f4a261",

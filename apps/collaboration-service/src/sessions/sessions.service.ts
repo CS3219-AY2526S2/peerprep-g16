@@ -21,7 +21,7 @@ export interface Session {
 }
 
 const REDIS_PREFIX = 'collab:session:';
-const FLUSH_DELAY_MS = 5000;
+const FLUSH_DELAY_MS = 1000;
 const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
