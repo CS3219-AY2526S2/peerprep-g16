@@ -1,12 +1,4 @@
-import React from 'react';
 import webStyles from './styles';
-
-
-interface TestCase {
-    input: string;
-    expectedOutput: string;
-}
-
 
 interface NewQuestion {
     questionId: string;
@@ -15,18 +7,16 @@ interface NewQuestion {
     difficulty: string;
     description: string;
     constraints: string[];
-    examples: { input: any; output: any; explanation?: string }[];
+    examples: { input: string; output: string; explanation?: string }[];
     hints: string[];
     testCases: {
-        sample: { input: any; expectedOutput: any }[];
-        hidden: { input: any; expectedOutput: any }[];
+        sample: { input: string; expectedOutput: string }[];
+        hidden: { input: string; expectedOutput: string }[];
     };
     modelAnswer: string;
     modelAnswerTimeComplexity: string;
     modelAnswerExplanation: string;
 }
-
-
 
 interface AddQuestionModalProps {
     show: boolean;
@@ -57,24 +47,20 @@ interface AddQuestionModalProps {
     onClose: () => void;
 }
 
-
 function AddQuestionModal({
     show, newQuestion, setNewQuestion, topicInput, setTopicInput,
     constraintInput, setConstraintInput, hintInput, setHintInput,
     sampleInput, setSampleInput, sampleOutput, setSampleOutput,
     hiddenInput, setHiddenInput, hiddenOutput, setHiddenOutput,
-    modelAnswer, setModelAnswer, modelAnswerTimeComplexity, setModelAnswerTimeComplexity, modelAnswerExplanation, setModelAnswerExplanation,
     handleAddQuestion, questionError, onClose
 }: AddQuestionModalProps) {
     if (!show) return null;
-
 
     return (
         <>
             <div style={styles.modalOverlay}>
                 <div style={styles.modalBox}>
                     <h3 style={{ marginBottom: "20px" }}>Add New Question</h3>
-
 
                     <label style={styles.modalLabel}>
                         Question ID:
@@ -86,7 +72,6 @@ function AddQuestionModal({
                         />
                     </label>
 
-
                     <label style={styles.modalLabel}>
                         Title:
                         <input
@@ -96,7 +81,6 @@ function AddQuestionModal({
                             style={styles.modalInput}
                         />
                     </label>
-
 
                     <label style={styles.modalLabel}>
                         Topics:
@@ -133,7 +117,6 @@ function AddQuestionModal({
                         ))}
                     </label>
 
-
                     <label style={styles.modalLabel}>
                         Difficulty:
                         <select
@@ -148,7 +131,6 @@ function AddQuestionModal({
                         </select>
                     </label>
 
-
                     <label style={styles.modalLabel}>
                         Description:
                         <textarea
@@ -157,8 +139,6 @@ function AddQuestionModal({
                             style={{ ...styles.modalInput, height: "100px", resize: "vertical" as const }}
                         />
                     </label>
-
-
 
                     {/* Constraints */}
                     <label style={styles.modalLabel}>
@@ -184,8 +164,6 @@ function AddQuestionModal({
                         ))}
                     </label>
 
-
-
                     {/* Hints */}
                     <label style={styles.modalLabel}>
                         Hints:
@@ -209,8 +187,6 @@ function AddQuestionModal({
                             </div>
                         ))}
                     </label>
-
-
 
                     {/* Sample Test Cases */}
                     <label style={styles.modalLabel}>
@@ -240,8 +216,6 @@ function AddQuestionModal({
                             </div>
                         ))}
                     </label>
-
-
 
                     {/* Hidden Test Cases */}
                     <label style={styles.modalLabel}>
@@ -320,8 +294,6 @@ function AddQuestionModal({
     );
 }
 
-
 const styles = webStyles
-
 
 export default AddQuestionModal;

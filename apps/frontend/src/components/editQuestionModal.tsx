@@ -1,9 +1,8 @@
-import React from 'react';
 import webStyles from './styles';
 
 interface TestCase {
-    input: any;
-    expectedOutput: any;
+    input: string;
+    expectedOutput: string;
 }
 
 interface EditQuestion {
@@ -21,7 +20,6 @@ interface EditQuestion {
     modelAnswer: string;
     modelAnswerTimeComplexity: string;
     modelAnswerExplanation: string;
-    // Add other fields as needed
 }
 
 interface EditQuestionModalProps {
@@ -64,9 +62,6 @@ function EditQuestionModal({
     editSampleOutput, setEditSampleOutput,
     editHiddenInput, setEditHiddenInput,
     editHiddenOutput, setEditHiddenOutput,
-    modelAnswer, setModelAnswer,
-    modelAnswerTimeComplexity, setModelAnswerTimeComplexity,
-    modelAnswerExplanation, setModelAnswerExplanation,
     handleEditQuestion,
     questionError,
     onClose
@@ -130,7 +125,8 @@ function EditQuestionModal({
                                 <button
                                     onClick={() => setEditQuestion({
                                         ...editQuestion,
-                                        topic: (Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]).filter((_: any, idx: number) => idx !== i)
+                                        topic: (Array.isArray(editQuestion.topic) ? editQuestion.topic : [editQuestion.topic]).filter((_, idx) => idx !== i)
+
                                     })}
                                     style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}
                                 >
@@ -189,7 +185,7 @@ function EditQuestionModal({
                             <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
                                 <span>{c}</span>
                                 <button
-                                    onClick={() => setEditQuestion({ ...editQuestion, constraints: (editQuestion.constraints || []).filter((_: any, idx: number) => idx !== i) })}
+                                    onClick={() => setEditQuestion({ ...editQuestion, constraints: (editQuestion.constraints || []).filter((_, idx) => idx !== i) })}
                                     style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}
                                 >
                                     x
@@ -216,7 +212,7 @@ function EditQuestionModal({
                         {(editQuestion.hints || []).map((h: string, i: number) => (
                             <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
                                 <span>{h}</span>
-                                <button onClick={() => setEditQuestion({ ...editQuestion, hints: editQuestion.hints.filter((_: any, idx: number) => idx !== i) })}
+                                <button onClick={() => setEditQuestion({ ...editQuestion, hints: editQuestion.hints.filter((_, idx) => idx !== i) })}
                                     style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
                             </div>
                         ))}
@@ -242,10 +238,10 @@ function EditQuestionModal({
                                 }
                             }} style={styles.promoteButton}>Add</button>
                         </div>
-                        {(editQuestion.testCases.sample || []).map((s: any, i: number) => (
+                        {(editQuestion.testCases.sample || []).map((s: TestCase, i: number) => (
                             <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
                                 <span>Input: {s.input} | Output: {s.expectedOutput}</span>
-                                <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, sample: editQuestion.testCases.sample.filter((_: any, idx: number) => idx !== i) } })}
+                                <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, sample: editQuestion.testCases.sample.filter((_, idx) => idx !== i) } })}
                                     style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
                             </div>
                         ))}
@@ -256,7 +252,7 @@ function EditQuestionModal({
                         Hidden Test Cases: <span style={{ color: "red" }}>*</span>
                         <div style={{ display: "flex", gap: "8px" }}>
                             <input
-                                type="text" 
+                                type="text"
                                 value={editHiddenInput}
                                 onChange={(e) => setEditHiddenInput(e.target.value)}
                                 style={{ ...styles.modalInput, flex: 1 }}
@@ -273,10 +269,10 @@ function EditQuestionModal({
                                 }
                             }} style={styles.promoteButton}>Add</button>
                         </div>
-                        {(editQuestion.testCases.hidden || []).map((h: any, i: number) => (
+                        {(editQuestion.testCases.hidden || []).map((h: TestCase, i: number) => (
                             <div key={i} style={{ display: "flex", justifyContent: "space-between", marginTop: "4px", fontSize: "13px" }}>
                                 <span>Input: {h.input} | Output: {h.expectedOutput}</span>
-                                <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, hidden: editQuestion.testCases.hidden.filter((_: any, idx: number) => idx !== i) } })}
+                                <button onClick={() => setEditQuestion({ ...editQuestion, testCases: { ...editQuestion.testCases, hidden: editQuestion.testCases.hidden.filter((_, idx) => idx !== i) } })}
                                     style={{ ...styles.promoteButton, backgroundColor: "red", padding: "2px 8px" }}>x</button>
                             </div>
                         ))}

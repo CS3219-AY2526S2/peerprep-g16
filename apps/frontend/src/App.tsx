@@ -9,7 +9,6 @@ import Profile from "./pages/profile"
 import Collaboration from './pages/collaboration'
 import ModelAnswer from "./pages/modelAnswer";
 import api from "./api/axiosInstance";
-import webStyles from './components/styles'
 
 function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("login");
@@ -72,42 +71,53 @@ function Appcontent() {
         }
     }, [location.pathname]);
 
-    const login = async (event: any) => {
+    const login = async (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
+        console.log("VITE_USER_SERVICE_URL:", import.meta.env.VITE_USER_SERVICE_URL); // ← add this
         try {
-            const response = await api.post("http://localhost:3001/auth/login", {
-                email,
-                password,
-            });
+            const response = await api.post(`${import.meta.env.VITE_USER_SERVICE_URL}/auth/login`,
+                { email, password });
 
-            console.log("response", response);
-            localStorage.setItem(
-                "login",
-                JSON.stringify({
-                    userLogin: true,
-                    token: response.data.data.accessToken,
-                    refreshToken: response.data.data.refreshToken,
-                    id: response.data.data.id,
-                    username: response.data.data.username,
-                    email: response.data.data.email,
-                    isAdmin: response.data.data.isAdmin,
-                })
-            );
+            localStorage.setItem("login", JSON.stringify({
+                userLogin: true,
+                token: response.data.data.accessToken,
+                refreshToken: response.data.data.refreshToken,
+                id: response.data.data.id,
+                username: response.data.data.username,
+                email: response.data.data.email,
+                isAdmin: response.data.data.isAdmin,
+            }));
+
             setSuccess("Login successful! Directing to homepage...")
             setError("")
-            setTimeout(() => {
+
+            setTimeout(async () => {
                 setSuccess("")
                 if (response.data.data.isAdmin) {
                     navigate('/admin')
                 } else {
-                    navigate('/homepage')
+                    try {
+                        const userId = response.data.data.id;
+                        const matchRes = await api.get(`${import.meta.env.VITE_MATCHING_SERVICE_URL}/match/active-match/${userId}`);
+                        if (matchRes.data.status === 'active_match') {
+                            navigate(`/collaboration/${matchRes.data.roomId}`);
+                        } else {
+                            navigate('/homepage');
+                        }
+                    } catch (err) {
+                        console.error('Active match check failed:', err);
+                        navigate('/homepage'); // fallback
+                    }
                 }
             }, 1000)
-        } catch (error: any) {
+        } catch (error) {
             setEmail("")
             setPassword("")
-            if (error.response !== undefined) {
-                setError(error.response.data.message);
+            if (error instanceof Error && 'response' in error) {
+                const axiosError = error as { response?: { data?: { message?: string } } };
+                if (axiosError.response !== undefined) {
+                    setError(axiosError.response.data?.message ?? "An error occurred");
+                }
             }
             console.log(error);
         }
@@ -188,7 +198,7 @@ function Appcontent() {
                 <Route path="/history"></Route>
                 <Route path="/collaboration/:sessionId" element={
                     <ProtectedUserRoute>
-                        <Collaboration/>
+                        <Collaboration />
                     </ProtectedUserRoute>
                 }
                 />

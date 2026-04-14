@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import api from "../api/axiosInstance";
 import styles from "../components/styles";
 
+const QUESTION_SERVICE_URL = import.meta.env.VITE_QUESTION_SERVICE_URL as string;
+
 function ModelAnswer() {
     const { questionId } = useParams<{ questionId: string }>();
     const navigate = useNavigate();
@@ -21,7 +23,7 @@ function ModelAnswer() {
         }
         const loadModelAnswer = async () => {
             try {
-                const res = await api.get(`http://localhost:3002/questions/${questionId}/model-answer`);
+                const res = await api.get(`${QUESTION_SERVICE_URL}/questions/${questionId}/model-answer`);
                 setData(res.data);
             } catch {
                 setData(null);
@@ -31,7 +33,7 @@ function ModelAnswer() {
         };
         const loadQuestionDescription = async () => {
             try {
-                const res = await api.get(`http://localhost:3002/questions/${questionId}/description`);
+                const res = await api.get(`${QUESTION_SERVICE_URL}/questions/${questionId}/description`);
                 setQuestionDescription(res.data.description);
             } catch {
                 setQuestionDescription(null);

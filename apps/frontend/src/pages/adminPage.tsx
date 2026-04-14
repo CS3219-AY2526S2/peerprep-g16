@@ -1,5 +1,5 @@
 import React from "react"
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import api from "../api/axiosInstance"
 import UserTable from "../components/userTable";
 import QuestionTable from "../components/questionTable";
@@ -8,6 +8,46 @@ import EditQuestionModal from "../components/editQuestionModal";
 import styles from "../components/styles";
 import UploadJSONFile from "../components/uploadJSONFile";
 
+const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
+const QUESTION_SERVICE_URL = import.meta.env.VITE_QUESTION_SERVICE_URL as string;
+
+interface User {
+    id: string;
+    username: string;
+    email: string;
+    isAdmin: boolean;
+}
+
+interface TestCase {
+    input: string;
+    expectedOutput: string;
+}
+
+interface Question {
+    questionId: string;
+    title: string;
+    topic: string[];
+    difficulty: string;
+    description: string;
+    constraints: string[];
+    examples: { input: string; output: string; explanation?: string }[];
+    hints: string[];
+    testCases: {
+        sample: TestCase[];
+        hidden: TestCase[];
+    };
+    modelAnswer: string;
+    modelAnswerTimeComplexity: string;
+    modelAnswerExplanation: string;
+}
+
+interface ApiError {
+    response?: {
+        data?: {
+            message?: string | string[];
+        };
+    };
+}
 
 function AdminPage() {
     const stored = localStorage.getItem("login");
@@ -17,33 +57,31 @@ function AdminPage() {
     const [userSuccess, setUserSuccess] = useState("");
     const [userError, setUserError] = useState("");
     const [questionSuccess, setQuestionSuccess] = useState("");
-    const [questionError, setQuestionError] = useState(""); const [users, setUsers] = useState<any[]>([]);
+    const [questionError, setQuestionError] = useState("");
+    const [users, setUsers] = useState<User[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [filterAdmin, setFilterAdmin] = useState("all");
     const [sortField, setSortField] = useState("username");
     const [sortOrder, setSortOrder] = useState("asc");
     const [questionSearchQuery, setQuestionSearchQuery] = useState("");
     const [filterTopic, setFilterTopic] = useState("all");
-    const [questions, setQuestions] = useState<any[]>([]);
+    const [questions, setQuestions] = useState<Question[]>([]);
     const [filterDifficulty, setFilterDifficulty] = useState("all");
     const [showAddQuestion, setShowAddQuestion] = useState(false);
     const [showJSONUpload, setShowJSONUpload] = useState(false);
     const [modelAnswer, setModelAnswer] = useState("");
     const [modelAnswerTimeComplexity, setModelAnswerTimeComplexity] = useState("");
     const [modelAnswerExplanation, setModelAnswerExplanation] = useState("");
-    const [newQuestion, setNewQuestion] = useState({
+    const [newQuestion, setNewQuestion] = useState<Question>({
         questionId: "",
         title: "",
-        topic: [] as string[],
+        topic: [],
         difficulty: "",
         description: "",
-        constraints: [] as string[],
-        examples: [] as { input: any; output: any; explanation?: string }[],
-        hints: [] as string[],
-        testCases: {
-            sample: [] as { input: any; expectedOutput: any }[],
-            hidden: [] as { input: any; expectedOutput: any }[]
-        },
+        constraints: [],
+        examples: [],
+        hints: [],
+        testCases: { sample: [], hidden: [] },
         modelAnswer: "",
         modelAnswerTimeComplexity: "",
         modelAnswerExplanation: ""
@@ -57,36 +95,73 @@ function AdminPage() {
     const [hiddenInput, setHiddenInput] = useState("");
     const [hiddenOutput, setHiddenOutput] = useState("");
     const [showEditQuestion, setShowEditQuestion] = useState(false);
-    const [editQuestion, setEditQuestion] = useState<any>(null);
+    const [editQuestion, setEditQuestion] = useState<Question | null>(null);
     const [editConstraintInput, setEditConstraintInput] = useState("");
     const [editHintInput, setEditHintInput] = useState("");
     const [editSampleInput, setEditSampleInput] = useState("");
     const [editSampleOutput, setEditSampleOutput] = useState("");
     const [editHiddenInput, setEditHiddenInput] = useState("");
     const [editHiddenOutput, setEditHiddenOutput] = useState("");
-    const [showTopicDropdown, setShowTopicDropdown] = useState(false);
-    const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
+    const [selectedTopics] = useState<string[]>([]);
     const [editModelAnswer, setEditModelAnswer] = useState("");
     const [editModelAnswerTimeComplexity, setEditModelAnswerTimeComplexity] = useState("");
     const [editModelAnswerExplanation, setEditModelAnswerExplanation] = useState("");
 
-    useEffect(() => {
-        fetchUsers();
-        fetchQuestions();
-    }, []);
+    const fetchUsers = useCallback(async () => {
+        try {
+            const response = await api.get(`${USER_SERVICE_URL}/users`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setUsers(response.data.data);
+        } catch {
+            setUserError("Failed to fetch users.");
+        }
+    }, [token]);
+
+    const fetchQuestions = useCallback(async () => {
+        try {
+            const response = await api.get(`${QUESTION_SERVICE_URL}/questions`,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
+            setQuestions(response.data);
+        } catch {
+            setQuestionError("Failed to fetch questions.");
+        }
+    }, [token]);
 
     useEffect(() => {
-        setUserSuccess("");
-        setUserError("");
-        setQuestionSuccess("");
-        setQuestionError("");
-    }, [activeTab]);
+        const loadUsers = async () => {
+            try {
+                const response = await api.get(`${USER_SERVICE_URL}/users`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                setUsers(response.data.data);
+            } catch {
+                setUserError("Failed to fetch users.");
+            }
+        };
+        loadUsers();
+    }, [token]); // depend on token instead
+
+    useEffect(() => {
+        const loadQuestions = async () => {
+            try {
+                const response = await api.get(`${QUESTION_SERVICE_URL}/questions`,
+                    { headers: { Authorization: `Bearer ${token}` } }
+                );
+                setQuestions(response.data);
+            } catch {
+                setQuestionError("Failed to fetch questions.");
+            }
+        };
+        loadQuestions();
+    }, [token]);
 
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             const target = e.target as HTMLElement;
             if (!target.closest('.topic-dropdown')) {
-                setShowTopicDropdown(false);
+                // dropdown state removed since showTopicDropdown was unused
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
@@ -102,28 +177,17 @@ function AdminPage() {
         }
     };
 
-    const fetchUsers = async () => {
-        try {
-            const response = await api.get("http://localhost:3001/users",
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            setUsers(response.data.data);
-        } catch (error: any) {
-            setUserError("Failed to fetch users.");
-        }
-    };
-
     const handlePromote = async (userId: string) => {
         const confirmed = window.confirm("Are you sure you want to promote this user to admin?");
         if (!confirmed) return;
         try {
-            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
+            await api.patch(`${USER_SERVICE_URL}/users/${userId}/privilege`,
                 { isAdmin: true },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setUserSuccess("User promoted to admin successfully!");
             fetchUsers();
-        } catch (error: any) {
+        } catch {
             setUserError("Failed to promote user.");
         }
     };
@@ -136,13 +200,13 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to demote this admin to user?");
         if (!confirmed) return;
         try {
-            await api.patch(`http://localhost:3001/users/${userId}/privilege`,
+            await api.patch(`${USER_SERVICE_URL}/users/${userId}/privilege`,
                 { isAdmin: false },
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setUserSuccess("User demoted successfully!");
             fetchUsers();
-        } catch (error: any) {
+        } catch {
             setUserError("Failed to demote user.");
         }
     };
@@ -158,38 +222,28 @@ function AdminPage() {
             u.id.toLowerCase().includes(searchQuery.toLowerCase())
         )
         .sort((a, b) => {
-            const valA = a[sortField]?.toLowerCase() ?? "";
-            const valB = b[sortField]?.toLowerCase() ?? "";
+            const key = sortField as keyof User;
+            const valA = String(a[key] ?? "").toLowerCase();
+            const valB = String(b[key] ?? "").toLowerCase();
             if (valA < valB) return sortOrder === "asc" ? -1 : 1;
             if (valA > valB) return sortOrder === "asc" ? 1 : -1;
             return 0;
         });
 
-    const fetchQuestions = async () => {
-        try {
-            const response = await api.get("http://localhost:3002/questions",
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-            setQuestions(response.data);
-        } catch (error: any) {
-            setQuestionError("Failed to fetch questions.");
-        }
-    };
-
     const filteredQuestions = questions
         .filter(q =>
             selectedTopics.length === 0 ||
-            (Array.isArray(q.topic)
-                ? q.topic.some((t: string) => selectedTopics.includes(t))
-                : selectedTopics.includes(q.topic))
-        ).filter(q => filterDifficulty === "all" || q.difficulty === filterDifficulty)
+            q.topic.some((t: string) => selectedTopics.includes(t))
+        )
+        .filter(q => filterDifficulty === "all" || q.difficulty === filterDifficulty)
         .filter(q =>
             q.questionId.toLowerCase().includes(questionSearchQuery.toLowerCase()) ||
             q.title.toLowerCase().includes(questionSearchQuery.toLowerCase())
         )
         .sort((a, b) => {
-            const valA = a[sortField]?.toLowerCase() ?? "";
-            const valB = b[sortField]?.toLowerCase() ?? "";
+            const key = sortField as keyof Question;
+            const valA = String(a[key] ?? "").toLowerCase();
+            const valB = String(b[key] ?? "").toLowerCase();
             if (valA < valB) return sortOrder === "asc" ? -1 : 1;
             if (valA > valB) return sortOrder === "asc" ? 1 : -1;
             return 0;
@@ -199,12 +253,12 @@ function AdminPage() {
         const confirmed = window.confirm("Are you sure you want to delete this question?");
         if (!confirmed) return;
         try {
-            await api.delete(`http://localhost:3002/questions/${questionId}`,
+            await api.delete(`${QUESTION_SERVICE_URL}/questions/${questionId}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             setQuestionSuccess("Question deleted successfully!");
             fetchQuestions();
-        } catch (error: any) {
+        } catch {
             setQuestionError("Failed to delete question.");
         }
     };
@@ -219,7 +273,7 @@ function AdminPage() {
             return;
         }
         try {
-            await api.post("http://localhost:3002/questions",
+            await api.post(`${QUESTION_SERVICE_URL}/questions`,
                 newQuestion,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -232,8 +286,13 @@ function AdminPage() {
             });
             fetchQuestions();
             setQuestionError("");
-        } catch (error: any) {
-            setQuestionError(error.response?.data?.message || "Failed to add question.");
+        } catch (err) {
+            const error = err as ApiError;
+            const messages = error.response?.data?.message;
+            const detail = Array.isArray(messages)
+                ? messages.join("\n")
+                : messages ?? "Failed to add question.";
+            setQuestionError(detail);
         }
     };
 
@@ -244,7 +303,6 @@ function AdminPage() {
         try {
             const text = await file.text();
             const parsed = JSON.parse(text);
-
             const questionsToUpload = Array.isArray(parsed) ? parsed : [parsed];
 
             let successCount = 0;
@@ -252,13 +310,18 @@ function AdminPage() {
 
             for (const q of questionsToUpload) {
                 try {
-                    await api.post("http://localhost:3002/questions", q, {
+                    await api.post(`${QUESTION_SERVICE_URL}/questions`, q, {
                         headers: { Authorization: `Bearer ${token}` }
                     });
                     successCount++;
-                } catch {
+                } catch (err) {
+                    const error = err as ApiError;
                     const label = q.title ? `"${q.title}" (${q.questionId})` : q.questionId ?? "Unknown";
-                    failedQuestions.push(label);
+                    const messages = error.response?.data?.message;
+                    const detail = Array.isArray(messages)
+                        ? messages.join(", ")
+                        : messages ?? "Unknown error";
+                    failedQuestions.push(`${label}: ${detail}`);
                 }
             }
 
@@ -283,6 +346,7 @@ function AdminPage() {
     };
 
     const handleEditQuestion = async () => {
+        if (!editQuestion) return;
         if (!editQuestion.title || !editQuestion.topic || !editQuestion.difficulty || !editQuestion.description) {
             setQuestionError("Please fill in all required fields.");
             return;
@@ -292,7 +356,7 @@ function AdminPage() {
             return;
         }
         try {
-            await api.patch(`http://localhost:3002/questions/${editQuestion.questionId}`,
+            await api.patch(`${QUESTION_SERVICE_URL}/questions/${editQuestion.questionId}`,
                 editQuestion,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
@@ -300,8 +364,13 @@ function AdminPage() {
             setShowEditQuestion(false);
             setEditQuestion(null);
             fetchQuestions();
-        } catch (error: any) {
-            setQuestionError(error.response?.data?.message || "Failed to update question.");
+        } catch (err) {
+            const error = err as ApiError;
+            const messages = error.response?.data?.message;
+            const detail = Array.isArray(messages)
+                ? messages.join("\n")
+                : messages ?? "Failed to update question.";
+            setQuestionError(detail);
         }
     };
 
@@ -309,10 +378,28 @@ function AdminPage() {
         <div style={{ display: "flex", marginTop: "60px", minHeight: "100vh" }}>
             <div style={styles.sidebar}>
                 <h3 style={styles.heading}>Admin</h3>
-                <button onClick={() => setActiveTab("user")} style={activeTab === "user" ? styles.activeTab : styles.tab}>
+                <button
+                    onClick={() => {
+                        setActiveTab("user");
+                        setUserSuccess("");
+                        setUserError("");
+                        setQuestionSuccess("");
+                        setQuestionError("");
+                    }}
+                    style={activeTab === "user" ? styles.activeTab : styles.tab}
+                >
                     User Database
                 </button>
-                <button onClick={() => setActiveTab("question")} style={activeTab === "question" ? styles.activeTab : styles.tab}>
+                <button
+                    onClick={() => {
+                        setActiveTab("question");
+                        setUserSuccess("");
+                        setUserError("");
+                        setQuestionSuccess("");
+                        setQuestionError("");
+                    }}
+                    style={activeTab === "question" ? styles.activeTab : styles.tab}
+                >
                     Question Bank
                 </button>
             </div>
@@ -354,9 +441,8 @@ function AdminPage() {
                     questionSuccess={questionSuccess}
                     questionError={questionError}
                     setShowJSONUpload={setShowJSONUpload}
-                />
-                }
-            </div >
+                />}
+            </div>
             {showAddQuestion &&
                 <AddQuestionModal
                     show={showAddQuestion}
@@ -384,8 +470,7 @@ function AdminPage() {
                     setModelAnswerTimeComplexity={setModelAnswerTimeComplexity}
                     modelAnswerExplanation={modelAnswerExplanation}
                     setModelAnswerExplanation={setModelAnswerExplanation}
-                    onClose={() => setShowAddQuestion(false)
-                    }
+                    onClose={() => setShowAddQuestion(false)}
                 />
             }
             {showJSONUpload && (
@@ -405,7 +490,7 @@ function AdminPage() {
                 <EditQuestionModal
                     show={showEditQuestion}
                     editQuestion={editQuestion}
-                    setEditQuestion={setEditQuestion}
+                    setEditQuestion={(q) => setEditQuestion(q as Question | null)}
                     setEditTopicInput={setEditTopicInput}
                     editTopicInput={editTopicInput}
                     editConstraintInput={editConstraintInput}
@@ -435,7 +520,7 @@ function AdminPage() {
                     }}
                 />
             }
-        </div >
+        </div>
     );
 }
 

@@ -1,6 +1,36 @@
 import React, { useState } from "react";
 import styles from "./styles";
 
+// Typed interfaces to replace `any`
+interface TestCase {
+    input: string;
+    expectedOutput: string;
+}
+
+interface Example {
+    input: string;
+    output: string;
+    explanation?: string;
+}
+
+interface Question {
+    questionId?: string;
+    title?: string;
+    topic?: string | string[];
+    difficulty?: string;
+    description?: string;
+    constraints?: string[];
+    examples?: Example[];
+    hints?: string[];
+    testCases?: {
+        sample?: TestCase[];
+        hidden?: TestCase[];
+    };
+    modelAnswer?: string;
+    modelAnswerTimeComplexity?: string;
+    modelAnswerExplanation?: string;
+}
+
 interface UploadJSONFileProps {
     show: boolean;
     onClose: () => void;
@@ -10,13 +40,13 @@ interface UploadJSONFileProps {
 }
 
 function UploadJSONFile({ show, onClose, onUpload, questionError, questionSuccess }: UploadJSONFileProps) {
-    if (!show) return null;
-
-    const [previewData, setPreviewData] = useState<any[]>([]);
+    const [previewData, setPreviewData] = useState<Question[]>([]);
     const [fileName, setFileName] = useState("");
     const [fileRef, setFileRef] = useState<React.ChangeEvent<HTMLInputElement> | null>(null);
     const [confirmed, setConfirmed] = useState(false);
     const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+
+    if (!show) return null;
 
     const exampleJSON = JSON.stringify([
         {
@@ -48,11 +78,11 @@ function UploadJSONFile({ show, onClose, onUpload, questionError, questionSucces
 
         try {
             const text = await file.text();
-            const parsed = JSON.parse(text);
-            const questions = Array.isArray(parsed) ? parsed : [parsed];
+            const parsed: unknown = JSON.parse(text);
+            const questions: Question[] = Array.isArray(parsed) ? parsed : [parsed as Question];
             setPreviewData(questions);
             setFileRef(e);
-        } catch (err) {
+        } catch { 
             setPreviewData([]);
             setFileName("");
             alert("Invalid JSON file. Please check the format.");
@@ -83,7 +113,6 @@ function UploadJSONFile({ show, onClose, onUpload, questionError, questionSucces
                     Upload a <b>.json</b> file containing one or more questions.
                 </p>
 
-                {/* Example JSON — only show before file selected */}
                 {!previewData.length && (
                     <div style={styles.exampleBox}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
@@ -97,7 +126,6 @@ function UploadJSONFile({ show, onClose, onUpload, questionError, questionSucces
                     </div>
                 )}
 
-                {/* Full detail preview — collapsible cards */}
                 {previewData.length > 0 && !confirmed && (
                     <div style={styles.previewContainer}>
                         <p style={{ fontSize: "13px", fontWeight: "bold", color: "#333", marginBottom: "10px" }}>
@@ -123,28 +151,26 @@ function UploadJSONFile({ show, onClose, onUpload, questionError, questionSucces
                                     {expandedIndex === index && (
                                         <div style={styles.previewCardBody}>
                                             <div><b>Question ID:</b> {q.questionId ?? "—"}</div>
-
                                             <div>
                                                 <b>Topic:</b> {Array.isArray(q.topic) ? q.topic.join(", ") : q.topic ?? "—"}
                                             </div>
-
                                             <div><b>Description:</b> {q.description ?? "—"}</div>
 
-                                            {q.constraints?.length > 0 && (
+                                            {(q.constraints?.length ?? 0) > 0 && (
                                                 <div>
                                                     <b>Constraints:</b>
                                                     <ul style={{ margin: "4px 0 0 0", paddingLeft: "20px" }}>
-                                                        {q.constraints.map((c: string, i: number) => (
+                                                        {q.constraints!.map((c, i) => (
                                                             <li key={i}>{c}</li>
                                                         ))}
                                                     </ul>
                                                 </div>
                                             )}
 
-                                            {q.examples?.length > 0 && (
+                                            {(q.examples?.length ?? 0) > 0 && (
                                                 <div>
                                                     <b>Examples:</b>
-                                                    {q.examples.map((ex: any, i: number) => (
+                                                    {q.examples!.map((ex, i) => (
                                                         <div key={i} style={styles.previewNestedCard}>
                                                             <div><b>Input:</b> {ex.input}</div>
                                                             <div><b>Output:</b> {ex.output}</div>
@@ -154,21 +180,21 @@ function UploadJSONFile({ show, onClose, onUpload, questionError, questionSucces
                                                 </div>
                                             )}
 
-                                            {q.hints?.length > 0 && (
+                                            {(q.hints?.length ?? 0) > 0 && (
                                                 <div>
                                                     <b>Hints:</b>
                                                     <ul style={{ margin: "4px 0 0 0", paddingLeft: "20px" }}>
-                                                        {q.hints.map((h: string, i: number) => (
+                                                        {q.hints!.map((h, i) => (
                                                             <li key={i}>{h}</li>
                                                         ))}
                                                     </ul>
                                                 </div>
                                             )}
 
-                                            {q.testCases?.sample?.length > 0 && (
+                                            {(q.testCases?.sample?.length ?? 0) > 0 && (
                                                 <div>
                                                     <b>Sample Test Cases:</b>
-                                                    {q.testCases.sample.map((tc: any, i: number) => (
+                                                    {q.testCases!.sample!.map((tc, i) => (
                                                         <div key={i} style={styles.previewNestedCard}>
                                                             <div><b>Input:</b> {tc.input}</div>
                                                             <div><b>Expected Output:</b> {tc.expectedOutput}</div>
@@ -177,9 +203,9 @@ function UploadJSONFile({ show, onClose, onUpload, questionError, questionSucces
                                                 </div>
                                             )}
 
-                                            {q.testCases?.hidden?.length > 0 && (
+                                            {(q.testCases?.hidden?.length ?? 0) > 0 && (
                                                 <div>
-                                                    <b>Hidden Test Cases:</b> {q.testCases.hidden.length} case{q.testCases.hidden.length > 1 ? "s" : ""}
+                                                    <b>Hidden Test Cases:</b> {q.testCases!.hidden!.length} case{q.testCases!.hidden!.length > 1 ? "s" : ""}
                                                 </div>
                                             )}
 
@@ -246,21 +272,15 @@ function UploadJSONFile({ show, onClose, onUpload, questionError, questionSucces
 
                     {previewData.length > 0 && !confirmed && (
                         <>
-                            <button onClick={handleReset} style={styles.button}>
-                                Reselect
-                            </button>
-                            <button onClick={handleConfirm} style={styles.acceptButton}>
-                                Confirm Upload
-                            </button>
+                            <button onClick={handleReset} style={styles.button}>Reselect</button>
+                            <button onClick={handleConfirm} style={styles.acceptButton}>Confirm Upload</button>
                         </>
                     )}
 
                     {confirmed && (
                         <>
                             {questionError && (
-                                <button onClick={handleReset} style={styles.button}>
-                                    Try Again
-                                </button>
+                                <button onClick={handleReset} style={styles.button}>Try Again</button>
                             )}
                             <button onClick={() => { handleReset(); onClose(); }} style={styles.button}>
                                 {questionError ? "Cancel" : "Done"}
@@ -269,9 +289,7 @@ function UploadJSONFile({ show, onClose, onUpload, questionError, questionSucces
                     )}
 
                     {!confirmed && (
-                        <button onClick={() => { handleReset(); onClose(); }} style={styles.button}>
-                            Cancel
-                        </button>
+                        <button onClick={() => { handleReset(); onClose(); }} style={styles.button}>Cancel</button>
                     )}
                 </div>
             </div>

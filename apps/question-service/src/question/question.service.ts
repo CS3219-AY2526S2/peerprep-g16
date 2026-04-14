@@ -3,6 +3,7 @@ import { Question, QuestionDocument } from './schemas/question.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SelectQuestionDto } from './dto/select-question.dto';
+import { ConflictException, BadRequestException } from '@nestjs/common';
 
 /**
  * Service layer for question-related business logic.
@@ -43,8 +44,23 @@ export class QuestionService {
    * @returns Promise resolving to the newly created question
    */
   async create(createQuestionDto: any) {
-    const createdQuestion = new this.questionModel(createQuestionDto);
-    return createdQuestion.save();
+    try {
+      const createdQuestion = new this.questionModel(createQuestionDto);
+      return await createdQuestion.save();
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null) {
+        if ('code' in error && (error as any).code === 11000) {
+          throw new ConflictException(
+            `Question ${createQuestionDto.questionId} already exists`,
+          );
+        }
+        if ('name' in error && (error as any).name === 'ValidationError' && 'errors' in error) {
+          const fields = Object.values((error as any).errors).map((e: any) => e.path);
+          throw new BadRequestException(`Missing required fields: ${fields.join(', ')}`);
+        }
+      }
+      throw error;
+    }
   }
 
   /**

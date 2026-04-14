@@ -41,7 +41,7 @@ services:
     networks:
       - peerprep-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -125,6 +125,8 @@ services:
       QUESTION_SERVICE_URL: http://question-service:3002
       USER_SERVICE_URL: http://user-service:3001
       JUDGE0_URL: http://judge0-server:2358
+      # FRONTEND_URL: ${PUBLIC_IP}:5173
+      FRONTEND_URL: http://localhost:5173
     depends_on:
       redis:
         condition: service_healthy
@@ -158,7 +160,7 @@ services:
 
   judge0-workers:
     image: judge0/judge0:1.13.1
-    command: ["./scripts/workers"]
+    command: [ "./scripts/workers" ]
     volumes:
       - ./infra/docker/judge0.conf:/judge0.conf:ro
     privileged: true
@@ -210,6 +212,8 @@ services:
       REDIS_URL: "redis://redis:6379"
       MATCH_FOUND_STREAM: "match.found"
       JWT_SECRET: "${JWT_SECRET}"
+      FRONTEND_URL: http://localhost:5173
+      #FRONTEND_URL: "${PUBLIC_IP}:5173"
     depends_on:
       redis:
         condition: service_healthy
@@ -223,6 +227,17 @@ services:
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
+      args:
+         - VITE_USER_SERVICE_URL=http://localhost:3001
+         - VITE_QUESTION_SERVICE_URL=http://localhost:3002
+         - VITE_COLLABORATION_SERVICE_URL=http://localhost:3003
+         - VITE_MATCHING_SERVICE_URL=http://localhost:3004
+         - VITE_JUDGE0_URL=http://localhost:2358
+        # - VITE_USER_SERVICE_URL=${PUBLIC_IP}:3001
+        # - VITE_QUESTION_SERVICE_URL=${PUBLIC_IP}:3002
+        # - VITE_COLLABORATION_SERVICE_URL=${PUBLIC_IP}:3003
+        # - VITE_MATCHING_SERVICE_URL=${PUBLIC_IP}:3004
+        # - VITE_JUDGE0_URL=${PUBLIC_IP}:2358
     container_name: peerprep-frontend
     restart: unless-stopped
     ports:
@@ -234,6 +249,7 @@ volumes:
   mongodb_data:
   redis_data:
   judge0-db-data:
+
 
 networks:
   peerprep-network:
