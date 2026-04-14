@@ -181,6 +181,9 @@ services:
   # Frontend (React/Vite) — Port 5173
   # ============================================
   frontend:
+    depends_on:
+      user-service:
+        condition: service_healthy
     build:
       context: ./apps/frontend
       dockerfile: Dockerfile
