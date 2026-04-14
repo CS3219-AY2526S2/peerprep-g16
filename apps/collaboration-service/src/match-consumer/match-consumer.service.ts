@@ -43,18 +43,19 @@ export class MatchConsumerService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         `Consumer group "${GROUP_NAME}" created on "${STREAM_NAME}"`,
       );
-    } catch (err: any) {
-      if (err.message?.includes('BUSYGROUP')) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('BUSYGROUP')) {
         this.logger.log(
           `Consumer group "${GROUP_NAME}" already exists — resuming`,
         );
       } else {
-        this.logger.error(`Failed to create consumer group: ${err.message}`);
+        this.logger.error(`Failed to create consumer group: ${message}`);
       }
     }
 
     this.running = true;
-    this.poll();
+    void this.poll();
   }
 
   onModuleDestroy() {
@@ -65,7 +66,7 @@ export class MatchConsumerService implements OnModuleInit, OnModuleDestroy {
   private async poll() {
     while (this.running) {
       try {
-        const results = await (this.redis as any).xreadgroup(
+        const results = await this.redis.xreadgroup(
           'GROUP',
           GROUP_NAME,
           this.consumerId,
@@ -85,19 +86,19 @@ export class MatchConsumerService implements OnModuleInit, OnModuleDestroy {
             try {
               const event = parseFields(fields as string[]);
               await this.processEvent(event);
-            } catch (err: any) {
-              this.logger.error(
-                `Failed to process message ${id}: ${err.message}`,
-              );
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : String(err);
+              this.logger.error(`Failed to process message ${id}: ${message}`);
             } finally {
               // Always ACK so we don't reprocess indefinitely on error
-              await this.redis.xack(STREAM_NAME, GROUP_NAME, id);
+              await this.redis.xack(STREAM_NAME, GROUP_NAME, id as string);
             }
           }
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (this.running) {
-          this.logger.error(`Stream poll error: ${err.message}`);
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.error(`Stream poll error: ${message}`);
           await sleep(1000);
         }
       }

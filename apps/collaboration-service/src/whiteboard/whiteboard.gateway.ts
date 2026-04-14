@@ -11,7 +11,21 @@ import {
 import { Server, Socket } from 'socket.io';
 import { SessionsService } from '../sessions/sessions.service';
 import { ConfigService } from '@nestjs/config';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
+
+interface SocketUser {
+  id: string;
+  isAdmin: boolean;
+}
+
+interface AuthenticatedSocket extends Socket {
+  user: SocketUser;
+}
+
+interface SocketData {
+  sessionId?: string;
+  userId?: string;
+}
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class WhiteboardGateway
@@ -30,7 +44,7 @@ export class WhiteboardGateway
 
     // verify JWT before allowing WebSocket connection
     server.use((socket, next) => {
-      const token = socket.handshake.auth?.token;
+      const token = socket.handshake.auth['token'] as string | undefined;
       if (!token) {
         return next(new Error('No token provided'));
       }
@@ -49,9 +63,9 @@ export class WhiteboardGateway
         }
 
         // attach user to socket for use in handlers
-        (socket as any).user = payload;
+        (socket as AuthenticatedSocket).user = payload;
         next();
-      } catch (err) {
+      } catch {
         return next(new Error('Invalid or expired token'));
       }
     });
@@ -62,7 +76,7 @@ export class WhiteboardGateway
   }
 
   handleDisconnect(client: Socket) {
-    const { sessionId, userId } = client.data ?? {};
+    const { sessionId, userId } = (client.data as SocketData) ?? {};
     console.log(
       `Client disconnected: ${client.id}${sessionId ? ` (session ${sessionId})` : ''}`,
     );
@@ -84,15 +98,15 @@ export class WhiteboardGateway
     }
 
     // check user belongs to this session
-    const user = (client as any).user;
+    const user = (client as AuthenticatedSocket).user;
     if (session.userAId !== user.id && session.userBId !== user.id) {
       client.emit('error', { message: 'You are not part of this session' });
       return;
     }
 
-    client.join(data.sessionId);
-    client.data.sessionId = data.sessionId;
-    client.data.userId = user.id;
+    void client.join(data.sessionId);
+    (client.data as SocketData).sessionId = data.sessionId;
+    (client.data as SocketData).userId = user.id;
     console.log(`User ${user.id} joined session ${data.sessionId}`);
 
     this.sessionsService.onUserJoined(data.sessionId);
@@ -108,7 +122,8 @@ export class WhiteboardGateway
 
   @SubscribeMessage('whiteboardUpdate')
   handleWhiteboardUpdate(
-    @MessageBody() data: { sessionId: string; userId: string; elements: any[] },
+    @MessageBody()
+    data: { sessionId: string; userId: string; elements: unknown[] },
     @ConnectedSocket() client: Socket,
   ) {
     this.sessionsService.updateWhiteboard(data.sessionId, data.elements);
@@ -231,12 +246,16 @@ export class WhiteboardGateway
 
   @SubscribeMessage('code:result')
   handleCodeResult(
-    @MessageBody() data: { sessionId: string; output: any },
+    @MessageBody()
+    data: {
+      sessionId: string;
+      output: { type?: string; results?: Array<{ passed: boolean }> } | null;
+    },
     @ConnectedSocket() client: Socket,
   ) {
     // Track how many test cases passed so it can be saved on session end
     if (data.output?.type === 'tests' && Array.isArray(data.output.results)) {
-      const passed = data.output.results.filter((r: any) => r.passed).length;
+      const passed = data.output.results.filter((r) => r.passed).length;
       this.sessionsService.updateTestCasesPassed(data.sessionId, passed);
     }
     client.to(data.sessionId).emit('code:result', { output: data.output });

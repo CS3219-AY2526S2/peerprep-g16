@@ -9,6 +9,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AppService } from './app.service';
 
+interface CodeExecutionResponse {
+  stdout: string | null;
+  stderr: string | null;
+  compile_output: string | null;
+  status: { description: string } | null;
+  exit_code: number | null;
+}
+
 const LANGUAGE_IDS: Record<string, number> = {
   python: 71,
   javascript: 63,
@@ -61,7 +69,7 @@ export class AppController {
       );
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as CodeExecutionResponse;
 
     return {
       stdout: data.stdout ?? '',

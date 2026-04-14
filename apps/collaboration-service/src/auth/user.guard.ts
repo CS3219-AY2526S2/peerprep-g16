@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
-import * as jwt from 'jsonwebtoken';
+import jwt from 'jsonwebtoken';
 
 type AuthenticatedRequest = Request & {
   user?: { id: string; isAdmin: boolean };
@@ -21,7 +21,7 @@ type AuthenticatedRequest = Request & {
 export class UserGuard implements CanActivate {
   constructor(private readonly configService: ConfigService) {}
 
-  async canActivate(context: ExecutionContext): Promise<boolean> {
+  canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const authorization = request.headers.authorization;
 

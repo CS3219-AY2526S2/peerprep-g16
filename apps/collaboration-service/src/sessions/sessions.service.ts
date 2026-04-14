@@ -8,14 +8,29 @@ import { ConfigService } from '@nestjs/config';
 import { Server } from 'socket.io';
 import Redis from 'ioredis';
 
+export interface Question {
+  questionId: string;
+  title: string;
+  topic: string[];
+  difficulty: string;
+  description?: string;
+  constraints?: string[];
+  examples?: unknown[];
+  hints?: string[];
+  testCases?: {
+    sample?: Array<{ input: string; expectedOutput: string }>;
+    hidden?: Array<{ input: string; expectedOutput: string }>;
+  };
+}
+
 export interface Session {
   sessionId: string;
   userAId: string;
   userBId: string;
   matchId: string;
   topic: string;
-  question: any;
-  whiteboardElements: any[];
+  question: Question | null;
+  whiteboardElements: unknown[];
   whiteboardScreenshot?: string;
   code: string;
   language: string;
@@ -67,9 +82,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
       await this.redis.connect();
       this.logger.log('Connected to Redis');
       await this.restoreFromRedis();
-    } catch (err) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(
-        `Could not connect to Redis — running without persistence: ${err.message}`,
+        `Could not connect to Redis — running without persistence: ${message}`,
       );
     }
   }
@@ -95,7 +111,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => {
       this.flushTimers.delete(sessionId);
-      this.flushToRedis(sessionId);
+      void this.flushToRedis(sessionId);
     }, FLUSH_DELAY_MS);
     this.flushTimers.set(sessionId, timer);
   }
@@ -108,10 +124,9 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         `${REDIS_PREFIX}${sessionId}`,
         JSON.stringify(session),
       );
-    } catch (err) {
-      this.logger.error(
-        `Failed to persist session ${sessionId}: ${err.message}`,
-      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Failed to persist session ${sessionId}: ${message}`);
     }
   }
 
@@ -121,7 +136,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
       for (const key of keys) {
         const raw = await this.redis.get(key);
         if (!raw) continue;
-        const session: Session = JSON.parse(raw);
+        const session = JSON.parse(raw) as Session;
         if (session.status === 'ended') {
           await this.redis.del(key);
           continue;
@@ -132,10 +147,9 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
       if (keys.length > 0) {
         this.logger.log(`Restored ${keys.length} session(s) from Redis`);
       }
-    } catch (err) {
-      this.logger.error(
-        `Failed to restore sessions from Redis: ${err.message}`,
-      );
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Failed to restore sessions from Redis: ${message}`);
     }
   }
 
@@ -175,14 +189,14 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     const timeoutMs =
       this.configService.get<number>('QUESTION_TIMEOUT_MS') ??
       DEFAULT_QUESTION_TIMEOUT_MS;
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       this.questionTimeouts.delete(data.matchId);
       const s = this.sessions.get(data.matchId);
       if (!s || s.status !== 'waiting') return; // question already arrived
       this.logger.warn(
         `Question Service timed out for ${data.matchId} — using mock question`,
       );
-      await this.attachQuestion(data.matchId, this.getMockQuestion(data.topic));
+      void this.attachQuestion(data.matchId, this.getMockQuestion());
     }, timeoutMs);
     this.questionTimeouts.set(data.matchId, timer);
 
@@ -196,7 +210,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
    * POST /sessions/:id/question
    * Body: { question: Question }
    */
-  async attachQuestion(sessionId: string, question: any): Promise<void> {
+  async attachQuestion(sessionId: string, question: Question): Promise<void> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new Error(`Session not found: ${sessionId}`);
 
@@ -256,9 +270,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     this.sessions.delete(sessionId);
     try {
       await this.redis.del(`${REDIS_PREFIX}${sessionId}`);
-    } catch (err) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       this.logger.error(
-        `Failed to delete Redis key for ${sessionId}: ${err.message}`,
+        `Failed to delete Redis key for ${sessionId}: ${message}`,
       );
     }
 
@@ -268,7 +283,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
   // ─── State mutations (each schedules a debounced Redis flush) ─────────────
 
-  updateWhiteboard(sessionId: string, elements: any[]): void {
+  updateWhiteboard(sessionId: string, elements: unknown[]): void {
     const session = this.sessions.get(sessionId);
     if (!session) return;
     session.whiteboardElements = elements;
@@ -326,9 +341,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
       data.topic,
       data.userADifficulty,
       data.userBDifficulty,
-    ).catch((err) =>
-      this.logger.error(`fetchAndAttachQuestion error: ${err.message}`),
-    );
+    ).catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`fetchAndAttachQuestion error: ${message}`);
+    });
   }
 
   private async fetchAndAttachQuestion(
@@ -363,7 +379,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         }),
       });
       if (!res.ok) throw new Error(`Question service returned ${res.status}`);
-      const question = await res.json();
+      const question = (await res.json()) as Question;
 
       // Guard: don't overwrite if timeout fallback already fired
       const session = this.sessions.get(sessionId);
@@ -374,9 +390,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         return;
       }
       await this.attachQuestion(sessionId, question);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(
-        `Question fetch failed (${err.message}) — timeout fallback will handle it`,
+        `Question fetch failed (${message}) — timeout fallback will handle it`,
       );
     }
   }
@@ -388,8 +405,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     try {
       const res = await fetch(`${userServiceUrl}/users/${userId}/history`);
       if (!res.ok) return [];
-      const data = (await res.json()) as any[];
-      return data.map((a) => a.questionId).filter(Boolean);
+      const data = (await res.json()) as Array<{ questionId?: string }>;
+      return data
+        .map((a) => a.questionId)
+        .filter((id): id is string => Boolean(id));
     } catch {
       return [];
     }
@@ -429,8 +448,9 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         session.whiteboardScreenshot ?? '',
       );
       this.logger.log(`Published session.completed for ${session.sessionId}`);
-    } catch (err: any) {
-      this.logger.warn(`Failed to publish session.completed: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to publish session.completed: ${message}`);
     }
   }
 
@@ -467,18 +487,19 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     this.logger.log(
       `All users left session ${sessionId} — starting ${IDLE_TIMEOUT_MS / 1000}s idle timer`,
     );
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       this.idleTimers.delete(sessionId);
       this.logger.log(
         `Idle timeout reached — auto-terminating session ${sessionId}`,
       );
-      await this.endSession(sessionId);
-      io.to(sessionId).emit('endSession:confirmed');
+      void this.endSession(sessionId).then(() => {
+        io.to(sessionId).emit('endSession:confirmed');
+      });
     }, IDLE_TIMEOUT_MS);
     this.idleTimers.set(sessionId, timer);
   }
 
-  private getMockQuestion(_topic: string): any {
+  private getMockQuestion(): Question {
     // return {
     //     questionId: 'MOCK-001',
     //     title: `Mock ${topic} Question`,
