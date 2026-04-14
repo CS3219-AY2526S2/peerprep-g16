@@ -7,6 +7,7 @@ import {
     OnGatewayConnection,
     OnGatewayDisconnect,
     OnGatewayInit,
+    WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { SessionsService } from '../sessions/sessions.service';
@@ -22,6 +23,12 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         private readonly sessionsService: SessionsService,
         private readonly configService: ConfigService,
     ) {}
+
+    private assertSocketInSession(client: Socket, sessionId: string): void {
+        if (client.data.sessionId !== sessionId) {
+            throw new WsException('Unauthorized: not a member of this session');
+        }
+    }
 
     afterInit(server: Server) {
         this.sessionsService.setServer(server);
@@ -101,6 +108,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string; userId: string; elements: any[] },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         this.sessionsService.updateWhiteboard(data.sessionId, data.elements);
         client.to(data.sessionId).emit('whiteboardUpdate', {
             elements: data.elements,
@@ -113,6 +121,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string; userId: string; code: string; language?: string },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         this.sessionsService.updateCode(data.sessionId, data.code, data.language);
         client.to(data.sessionId).emit('codeUpdate', {
             code: data.code,
@@ -171,6 +180,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string; hintIndex: number },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         client.to(data.sessionId).emit('hint:request', { hintIndex: data.hintIndex });
     }
 
@@ -179,6 +189,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string; hintIndex: number },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         this.sessionsService.updateRevealedHints(data.sessionId, data.hintIndex + 1);
         client.to(data.sessionId).emit('hint:approve', { hintIndex: data.hintIndex });
     }
@@ -188,6 +199,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         client.to(data.sessionId).emit('hint:decline');
     }
 
@@ -196,6 +208,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         client.to(data.sessionId).emit('code:run');
     }
 
@@ -204,6 +217,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string; output: any },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         // Track how many test cases passed so it can be saved on session end
         if (data.output?.type === 'tests' && Array.isArray(data.output.results)) {
             const passed = data.output.results.filter((r: any) => r.passed).length;
@@ -217,6 +231,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string; userId: string; line: number; col: number },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         client.to(data.sessionId).emit('cursor:update', { userId: data.userId, line: data.line, col: data.col });
     }
 
@@ -225,6 +240,7 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         client.to(data.sessionId).emit('endSession:request');
     }
 
@@ -233,20 +249,25 @@ export class WhiteboardGateway implements OnGatewayInit, OnGatewayConnection, On
         @MessageBody() data: { sessionId: string },
         @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         client.to(data.sessionId).emit('endSession:decline');
     }
 
     @SubscribeMessage('whiteboard:screenshot')
     handleWhiteboardScreenshot(
         @MessageBody() data: { sessionId: string; screenshot: string },
+        @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         this.sessionsService.setWhiteboardScreenshot(data.sessionId, data.screenshot);
     }
 
     @SubscribeMessage('endSession:approve')
     async handleEndSessionApprove(
         @MessageBody() data: { sessionId: string },
+        @ConnectedSocket() client: Socket,
     ) {
+        this.assertSocketInSession(client, data.sessionId);
         await this.sessionsService.endSession(data.sessionId);
         this.server.to(data.sessionId).emit('endSession:confirmed');
     }
