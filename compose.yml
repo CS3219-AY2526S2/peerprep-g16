@@ -22,10 +22,10 @@ services:
       - peerprep-network
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh --quiet
-      interval: 30s
+      interval: 10s
       timeout: 10s
-      retries: 3
-      start_period: 10s
+      retries: 10
+      start_period: 40s
 
   # ============================================
   # Redis
