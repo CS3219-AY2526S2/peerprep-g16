@@ -1,8 +1,8 @@
-import Redis from "ioredis";
-import AttemptModel from "../model/attempt-model.js";
+import Redis from 'ioredis';
+import AttemptModel from '../model/attempt-model.js';
 
-const STREAM = "session.completed";
-const GROUP = "user-service-group";
+const STREAM = 'session.completed';
+const GROUP = 'user-service-group';
 const CONSUMER = `user-service-${process.pid}`;
 
 function parseFields(fields) {
@@ -21,6 +21,7 @@ async function saveAttempts(event) {
     questionTitle,
     topic,
     difficulty,
+    code,
     language,
     hintsUsed,
     testCasesPassed,
@@ -28,8 +29,13 @@ async function saveAttempts(event) {
     whiteboardScreenshot,
   } = event;
 
-  const sessionId = event.sessionId ?? "";
-  const topicArray = topic ? topic.split(",").map((t) => t.trim()).filter(Boolean) : [];
+  const sessionId = event.sessionId ?? '';
+  const topicArray = topic
+    ? topic
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean)
+    : [];
 
   const records = [
     { userId: userAId, partnerId: userBId },
@@ -46,46 +52,67 @@ async function saveAttempts(event) {
         questionTitle,
         topic: topicArray,
         difficulty,
+        code: code ?? '',
         language,
         hintsUsed: Number(hintsUsed) || 0,
         testCasesPassed: Number(testCasesPassed) || 0,
         duration: Number(duration) || 0,
         whiteboardScreenshot: whiteboardScreenshot
-          ? Buffer.from(whiteboardScreenshot.replace(/^data:image\/\w+;base64,/, ""), "base64")
+          ? Buffer.from(
+              whiteboardScreenshot.replace(/^data:image\/\w+;base64,/, ''),
+              'base64',
+            )
           : undefined,
       }),
     ),
   );
 
-  console.log(`[SessionConsumer] Saved attempt records for session ${sessionId}`);
+  console.log(
+    `[SessionConsumer] Saved attempt records for session ${sessionId}`,
+  );
 }
 
 export async function startSessionConsumer() {
-  const redisUrl = process.env.REDIS_URL ?? "redis://localhost:6379";
+  const redisUrl = process.env.REDIS_URL ?? 'redis://localhost:6379';
   const redis = new Redis(redisUrl);
 
-  redis.on("error", (err) => console.error("[SessionConsumer] Redis error:", err.message));
+  redis.on('error', (err) =>
+    console.error('[SessionConsumer] Redis error:', err.message),
+  );
 
   try {
-    await redis.xgroup("CREATE", STREAM, GROUP, "$", "MKSTREAM");
-    console.log(`[SessionConsumer] Consumer group "${GROUP}" ready on "${STREAM}"`);
+    await redis.xgroup('CREATE', STREAM, GROUP, '$', 'MKSTREAM');
+    console.log(
+      `[SessionConsumer] Consumer group "${GROUP}" ready on "${STREAM}"`,
+    );
   } catch (err) {
-    if (!err.message.includes("BUSYGROUP")) {
-      console.error("[SessionConsumer] Failed to create consumer group:", err.message);
+    if (!err.message.includes('BUSYGROUP')) {
+      console.error(
+        '[SessionConsumer] Failed to create consumer group:',
+        err.message,
+      );
       return;
     }
-    console.log(`[SessionConsumer] Consumer group "${GROUP}" already exists — continuing`);
+    console.log(
+      `[SessionConsumer] Consumer group "${GROUP}" already exists — continuing`,
+    );
   }
 
-  console.log("[SessionConsumer] Polling for session.completed events…");
+  console.log('[SessionConsumer] Polling for session.completed events…');
 
   while (true) {
     try {
       const results = await redis.xreadgroup(
-        "GROUP", GROUP, CONSUMER,
-        "COUNT", "10",
-        "BLOCK", "5000",
-        "STREAMS", STREAM, ">"
+        'GROUP',
+        GROUP,
+        CONSUMER,
+        'COUNT',
+        '10',
+        'BLOCK',
+        '5000',
+        'STREAMS',
+        STREAM,
+        '>',
       );
 
       if (!results) continue;
@@ -97,12 +124,15 @@ export async function startSessionConsumer() {
             await saveAttempts(event);
             await redis.xack(STREAM, GROUP, id);
           } catch (err) {
-            console.error(`[SessionConsumer] Failed to process message ${id}:`, err.message);
+            console.error(
+              `[SessionConsumer] Failed to process message ${id}:`,
+              err.message,
+            );
           }
         }
       }
     } catch (err) {
-      console.error("[SessionConsumer] Poll error:", err.message);
+      console.error('[SessionConsumer] Poll error:', err.message);
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
