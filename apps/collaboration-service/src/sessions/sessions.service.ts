@@ -200,7 +200,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
     async endSession(sessionId: string): Promise<Session | undefined> {
         const session = this.sessions.get(sessionId);
-        if (!session) return undefined;
+        if (!session || session.status === 'ended') return undefined;
 
         session.status = 'ended';
 
