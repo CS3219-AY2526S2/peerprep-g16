@@ -2,19 +2,27 @@ import { Controller, Post, Get, Delete, Body, Param } from '@nestjs/common';
 import { MatchService } from './match.service';
 import { RedisService } from '../redis/redis.service';
 
+interface JoinQueueDto {
+  userId: string;
+  username: string;
+  topic: string;
+  difficulty?: string;
+}
+
 @Controller('api/match')
 export class MatchController {
   constructor(
     private readonly matchService: MatchService,
     private readonly redisService: RedisService,
   ) { }
+
   @Post()
-  async joinQueue(@Body() body: any) {
+  async joinQueue(@Body() body: JoinQueueDto) {
     const { userId, username, topic, difficulty } = body;
     if (!userId || !username || !topic) {
       return { message: 'userId, username and topic are required' };
     }
-    return await this.matchService.joinQueue(userId, username, topic, difficulty);
+    return await this.matchService.joinQueue(userId, username, topic, difficulty ?? 'Random');
   }
 
   @Get('peek/:userId')
@@ -33,11 +41,6 @@ export class MatchController {
     return { message: 'Left queue successfully' };
   }
 
-  /**
-   * GET /api/match/health
-   *
-   * Health check endpoint - verifies Redis connection
-   */
   @Get('health')
   async healthCheck() {
     try {
