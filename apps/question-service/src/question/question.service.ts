@@ -3,6 +3,14 @@ import { Question, QuestionDocument } from './schemas/question.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SelectQuestionDto } from './dto/select-question.dto';
+import { CreateQuestionDto } from './dto/create-question.dto';
+import { UpdateQuestionDto } from './dto/update-question.dto';
+
+type QuestionFilter = {
+  topic: string;
+  difficulty?: string;
+  questionId?: { $nin: string[] };
+};
 
 /**
  * Service layer for question-related business logic.
@@ -42,7 +50,7 @@ export class QuestionService {
    * @param createQuestionDto Request payload containing question data
    * @returns Promise resolving to the newly created question
    */
-  async create(createQuestionDto: any) {
+  async create(createQuestionDto: CreateQuestionDto) {
     const createdQuestion = new this.questionModel(createQuestionDto);
     return createdQuestion.save();
   }
@@ -57,7 +65,9 @@ export class QuestionService {
    * @returns Promise resolving to the deleted question document
    */
   async deleteByQuestionId(questionId: string) {
-    const deleted = await this.questionModel.findOneAndDelete({ questionId }).exec();
+    const deleted = await this.questionModel
+      .findOneAndDelete({ questionId })
+      .exec();
 
     if (!deleted) {
       throw new NotFoundException(`Question ${questionId} not found`);
@@ -69,21 +79,24 @@ export class QuestionService {
   /**
    * Updates an existing question using its stable questionId.
    *
-   * This performs an in-place update rather than deleting and recreating
-   * the record, which helps preserve question identity across services.
-   * The questionId itself should generally remain unchanged.
+   * The incoming payload allows partial updates, but any provided `questionId`
+   * is ignored so callers cannot change the question's stable identifier.
    *
    * @param questionId Unique question identifier
    * @param updateQuestionDto Partial payload containing fields to update
    * @returns Promise resolving to the updated question document
    */
-  async updateByQuestionId(questionId: string, updateQuestionDto: any) {
-    delete updateQuestionDto.questionId;
+  async updateByQuestionId(
+    questionId: string,
+    updateQuestionDto: UpdateQuestionDto,
+  ) {
+    const updateData: UpdateQuestionDto = { ...updateQuestionDto };
+    delete updateData.questionId;
 
     const updated = await this.questionModel
       .findOneAndUpdate(
         { questionId },
-        { $set: updateQuestionDto },
+        { $set: updateData },
         { new: true, runValidators: true },
       )
       .exec();
@@ -132,17 +145,15 @@ export class QuestionService {
    *
    * @throws NotFoundException if no questions exist for the given criteria
    */
-  async selectQuestion(selectQuestionDto: SelectQuestionDto): Promise<Question> {
-    const {
-      topic,
-      difficulty,
-      attemptedQuestionIds = [],
-    } = selectQuestionDto;
+  async selectQuestion(
+    selectQuestionDto: SelectQuestionDto,
+  ): Promise<Question> {
+    const { topic, difficulty, attemptedQuestionIds = [] } = selectQuestionDto;
 
     const uniqueExcludeIds = Array.from(new Set(attemptedQuestionIds));
 
     // Step 1: try to find unattempted questions first
-    const primaryFilter: Record<string, any> = { topic };
+    const primaryFilter: QuestionFilter = { topic };
     if (difficulty) primaryFilter.difficulty = difficulty;
     if (uniqueExcludeIds.length > 0) {
       primaryFilter.questionId = { $nin: uniqueExcludeIds };
@@ -155,7 +166,7 @@ export class QuestionService {
     }
 
     // Step 2: fallback — allow previously attempted questions
-    const fallbackFilter: Record<string, any> = { topic };
+    const fallbackFilter: QuestionFilter = { topic };
     if (difficulty) fallbackFilter.difficulty = difficulty;
 
     const fallbackQuestions = await this.questionModel
@@ -167,7 +178,7 @@ export class QuestionService {
     }
 
     // Step 3: fallback 2 — allow other difficulty levels
-    const fallbackFilter2 = {
+    const fallbackFilter2: Pick<QuestionFilter, 'topic'> = {
       topic,
     };
 
@@ -180,11 +191,18 @@ export class QuestionService {
     }
 
     // Step 4: true no-question case
-    throw new NotFoundException(
-      `No question found for ${topic}`,
-    );
+    throw new NotFoundException(`No question found for ${topic}`);
   }
 
+  /**
+   * Returns one random question from a non-empty result set.
+   *
+   * This helper centralises random selection so all fallback branches use the
+   * same selection behavior.
+   *
+   * @param questions Candidate questions to choose from
+   * @returns One randomly selected question
+   */
   private pickRandomQuestion(questions: Question[]): Question {
     const randomIndex = Math.floor(Math.random() * questions.length);
     return questions[randomIndex];
