@@ -3,7 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
 import { QuestionModule } from './question/question.module';
 import { AuthModule } from './auth/auth.module';
-import { FeedbackModule } from './feedback/feedback.module'; 
+import { FeedbackModule } from './feedback/feedback.module';
 
 /**
  * Root application module.

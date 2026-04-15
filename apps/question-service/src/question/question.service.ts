@@ -27,7 +27,7 @@ export class QuestionService {
   constructor(
     @InjectModel(Question.name)
     private readonly questionModel: Model<QuestionDocument>,
-  ) { }
+  ) {}
 
   /**
    * Retrieves all questions matching the optional topic and difficulty filters.
@@ -83,9 +83,17 @@ export class QuestionService {
             `Question ${createQuestionDto.questionId} already exists`,
           );
         }
-        if ('name' in error && (error as any).name === 'ValidationError' && 'errors' in error) {
-          const fields = Object.values((error as any).errors).map((e: any) => e.path);
-          throw new BadRequestException(`Missing required fields: ${fields.join(', ')}`);
+        if (
+          'name' in error &&
+          (error as any).name === 'ValidationError' &&
+          'errors' in error
+        ) {
+          const fields = Object.values((error as any).errors).map(
+            (e: any) => e.path,
+          );
+          throw new BadRequestException(
+            `Missing required fields: ${fields.join(', ')}`,
+          );
         }
       }
       throw error;
@@ -260,11 +268,14 @@ export class QuestionService {
   async findModelAnswer(questionId: string) {
     const result = await this.questionModel
       .findOne({ questionId })
-      .select('modelAnswer modelAnswerTimeComplexity modelAnswerExplanation -_id')
+      .select(
+        'modelAnswer modelAnswerTimeComplexity modelAnswerExplanation -_id',
+      )
       .lean()
       .exec();
 
-    if (!result) throw new NotFoundException(`Question ${questionId} not found`);
+    if (!result)
+      throw new NotFoundException(`Question ${questionId} not found`);
     return result;
   }
 
@@ -275,9 +286,8 @@ export class QuestionService {
       .lean()
       .exec();
 
-    if (!result) throw new NotFoundException(`Question ${questionId} not found`);
+    if (!result)
+      throw new NotFoundException(`Question ${questionId} not found`);
     return result;
   }
 }
-
-

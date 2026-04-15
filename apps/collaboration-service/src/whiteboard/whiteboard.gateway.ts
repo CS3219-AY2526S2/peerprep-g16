@@ -11,7 +11,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { SessionsService } from '../sessions/sessions.service';
 import { ConfigService } from '@nestjs/config';
-import jwt from 'jsonwebtoken';
+import { verify } from 'jsonwebtoken';
 
 interface SocketUser {
   id: string;
@@ -53,7 +53,8 @@ export class WhiteboardGateway
       if (!secret) return next(new Error('JWT_SECRET not configured'));
 
       try {
-        const payload = jwt.verify(token, secret) as {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const payload = verify(token, secret) as {
           id: string;
           isAdmin: boolean;
         };

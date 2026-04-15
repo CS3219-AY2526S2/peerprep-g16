@@ -81,7 +81,9 @@ export class MatchConsumerService implements OnModuleInit, OnModuleDestroy {
 
         if (!results) continue; // BLOCK timeout, no messages
 
-        for (const [, messages] of results as Array<[string, Array<[string, string[]]>]>) {
+        for (const [, messages] of results as Array<
+          [string, Array<[string, string[]]>]
+        >) {
           for (const [id, fields] of messages) {
             try {
               const event = parseFields(fields);

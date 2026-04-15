@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
-import jwt from 'jsonwebtoken';
+import { verify } from 'jsonwebtoken';
 
 type AuthenticatedRequest = Request & {
   user?: { id: string; isAdmin: boolean };
@@ -34,7 +34,8 @@ export class UserGuard implements CanActivate {
     if (!secret) throw new Error('JWT_SECRET not configured');
 
     try {
-      const payload = jwt.verify(token, secret) as {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      const payload = verify(token, secret) as {
         id: string;
         isAdmin: boolean;
       };

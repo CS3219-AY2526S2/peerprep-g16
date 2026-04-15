@@ -268,7 +268,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     await this.publishSessionCompleted(session);
 
     // Fetch model answer data from Question Service (non-blocking)
-    let modelAnswerData = null;
+    let modelAnswerData: unknown = null;
     if (session.question?.questionId) {
       try {
         const questionServiceUrl =
@@ -280,8 +280,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         this.logger.log(
           `Model answer fetch status: ${res.status} for questionId: ${session.question.questionId}`,
         );
-        if (res.ok) modelAnswerData = await res.json();
-        this.logger.log(`Model answer data: ${JSON.stringify(modelAnswerData)}`);
+        if (res.ok) modelAnswerData = (await res.json()) as unknown;
+        this.logger.log(
+          `Model answer data: ${JSON.stringify(modelAnswerData)}`,
+        );
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
         this.logger.warn(`Failed to fetch model answer: ${message}`);
