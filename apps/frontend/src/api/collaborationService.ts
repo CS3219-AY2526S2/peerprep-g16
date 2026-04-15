@@ -51,3 +51,24 @@ export async function endSession(sessionId: string) {
         throw new Error("Failed to end session");
     }
 }
+
+export async function getActiveSession(): Promise<{
+    sessionId: string;
+    otherUserId: string;
+    questionId?: string;
+    language: string;
+    remainingMs: number;
+    startedAt: string;
+} | null> {
+    try {
+        const res = await api.get(`${COLLAB_URL}/sessions/active`);
+        return res.data;
+    } catch {
+        return null;
+    }
+}
+
+export async function rejoinSession(sessionId: string): Promise<{ sessionId: string; token: string; wsUrl: string }> {
+    const res = await api.post(`${COLLAB_URL}/sessions/${sessionId}/rejoin`);
+    return res.data;
+}

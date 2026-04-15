@@ -4,6 +4,7 @@ import api from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import MatchmakingOverlay from "../components/matchmakingOverlay";
 import TopicSelectionOverlay from "../components/topicSelectionOverlay";
+import { getActiveSession, rejoinSession } from "../api/collaborationService";
 const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
 const QUESTION_SERVICE_URL = import.meta.env.VITE_QUESTION_SERVICE_URL as string;
 const MATCHING_SERVICE_URL = import.meta.env.VITE_MATCHING_SERVICE_URL as string;
@@ -34,6 +35,13 @@ function Homepage() {
     const [topics, setTopics] = useState<string[]>([]);
     const [topicsLoading, setTopicsLoading] = useState(true);
 
+    const [activeSession, setActiveSession] = useState<{
+        sessionId: string;
+        remainingMs: number;
+    } | null>(null);
+    const [rejoinCountdown, setRejoinCountdown] = useState(0);
+    const rejoinTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
     const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const hasStartedRef = useRef(false);
@@ -44,6 +52,41 @@ function Homepage() {
         if (timerRef.current) clearInterval(timerRef.current);
         pollRef.current = null;
         timerRef.current = null;
+    };
+
+    useEffect(() => {
+        getActiveSession().then((session) => {
+            if (!session || session.remainingMs <= 0) return;
+            setActiveSession({ sessionId: session.sessionId, remainingMs: session.remainingMs });
+            setRejoinCountdown(Math.ceil(session.remainingMs / 1000));
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!activeSession) return;
+        rejoinTimerRef.current = setInterval(() => {
+            setRejoinCountdown((prev) => {
+                if (prev <= 1) {
+                    if (rejoinTimerRef.current) clearInterval(rejoinTimerRef.current);
+                    setActiveSession(null);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => {
+            if (rejoinTimerRef.current) clearInterval(rejoinTimerRef.current);
+        };
+    }, [activeSession]);
+
+    const handleRejoin = async () => {
+        if (!activeSession) return;
+        try {
+            await rejoinSession(activeSession.sessionId);
+        } catch {
+            // session may have ended; proceed anyway and let the collaboration page handle it
+        }
+        navigate(`/collaboration/${activeSession.sessionId}`);
     };
 
     const handleMatchFound = useCallback((data: MatchData) => {
@@ -253,6 +296,28 @@ function Homepage() {
 
     return (
         <>
+            {activeSession && (
+                <div style={rejoinBannerStyle}>
+                    <span>
+                        You have an active session. Rejoin within{" "}
+                        <strong>{rejoinCountdown}s</strong>.
+                    </span>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                        <button onClick={handleRejoin} style={rejoinButtonStyle}>
+                            Rejoin Session
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (rejoinTimerRef.current) clearInterval(rejoinTimerRef.current);
+                                setActiveSession(null);
+                            }}
+                            style={dismissButtonStyle}
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            )}
             <div style={{ display: "flex", marginTop: "60px" }}>
                 <h3 style={styles.heading}>Main Page</h3>
             </div>
@@ -336,5 +401,40 @@ function Homepage() {
         </>
     );
 }
+
+const rejoinBannerStyle: React.CSSProperties = {
+    marginTop: "60px",
+    width: "100%",
+    boxSizing: "border-box",
+    backgroundColor: "#fff8e1",
+    border: "1px solid #f9a825",
+    borderRadius: "0 0 8px 8px",
+    padding: "12px 24px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+};
+
+const rejoinButtonStyle: React.CSSProperties = {
+    padding: "8px 18px",
+    backgroundColor: "#f9a825",
+    border: "none",
+    borderRadius: "20px",
+    fontWeight: "bold",
+    fontSize: "14px",
+    cursor: "pointer",
+    color: "#fff",
+};
+
+const dismissButtonStyle: React.CSSProperties = {
+    padding: "8px 18px",
+    backgroundColor: "white",
+    border: "2px solid #ccc",
+    borderRadius: "20px",
+    fontWeight: "bold",
+    fontSize: "14px",
+    cursor: "pointer",
+};
 
 export default Homepage;

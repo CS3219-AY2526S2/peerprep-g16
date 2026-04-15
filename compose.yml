@@ -128,6 +128,7 @@ services:
       # FRONTEND_URL: ${PUBLIC_IP}:5173
       FRONTEND_URL: http://localhost:5173
       CODE_EXECUTOR_URL: http://code-executor:2358
+      MONGODB_URI: ${COLLAB_MONGODB_URI}
     depends_on:
       redis:
         condition: service_healthy

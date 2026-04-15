@@ -7,6 +7,7 @@ import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   OnGatewayInit,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { SessionsService } from '../sessions/sessions.service';
@@ -38,6 +39,12 @@ export class WhiteboardGateway
     private readonly sessionsService: SessionsService,
     private readonly configService: ConfigService,
   ) {}
+
+  private assertSocketInSession(client: Socket, sessionId: string): void {
+    if ((client.data as { sessionId?: string }).sessionId !== sessionId) {
+      throw new WsException('Unauthorized: not a member of this session');
+    }
+  }
 
   afterInit(server: Server) {
     this.sessionsService.setServer(server);
@@ -127,6 +134,7 @@ export class WhiteboardGateway
     data: { sessionId: string; userId: string; elements: unknown[] },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     this.sessionsService.updateWhiteboard(data.sessionId, data.elements);
     client.to(data.sessionId).emit('whiteboardUpdate', {
       elements: data.elements,
@@ -145,6 +153,7 @@ export class WhiteboardGateway
     },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     this.sessionsService.updateCode(data.sessionId, data.code, data.language);
     client.to(data.sessionId).emit('codeUpdate', {
       code: data.code,
@@ -175,6 +184,7 @@ export class WhiteboardGateway
     data: { sessionId: string; offer: RTCSessionDescriptionInit },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client.to(data.sessionId).emit('voice:offer', { offer: data.offer });
   }
 
@@ -184,6 +194,7 @@ export class WhiteboardGateway
     data: { sessionId: string; answer: RTCSessionDescriptionInit },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client.to(data.sessionId).emit('voice:answer', { answer: data.answer });
   }
 
@@ -192,6 +203,7 @@ export class WhiteboardGateway
     @MessageBody() data: { sessionId: string; candidate: RTCIceCandidateInit },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client
       .to(data.sessionId)
       .emit('voice:ice-candidate', { candidate: data.candidate });
@@ -202,6 +214,7 @@ export class WhiteboardGateway
     @MessageBody() data: { sessionId: string },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client.to(data.sessionId).emit('voice:end');
   }
 
@@ -210,6 +223,7 @@ export class WhiteboardGateway
     @MessageBody() data: { sessionId: string; hintIndex: number },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client
       .to(data.sessionId)
       .emit('hint:request', { hintIndex: data.hintIndex });
@@ -220,6 +234,7 @@ export class WhiteboardGateway
     @MessageBody() data: { sessionId: string; hintIndex: number },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     this.sessionsService.updateRevealedHints(
       data.sessionId,
       data.hintIndex + 1,
@@ -234,6 +249,7 @@ export class WhiteboardGateway
     @MessageBody() data: { sessionId: string },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client.to(data.sessionId).emit('hint:decline');
   }
 
@@ -242,6 +258,7 @@ export class WhiteboardGateway
     @MessageBody() data: { sessionId: string },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client.to(data.sessionId).emit('code:run');
   }
 
@@ -254,11 +271,13 @@ export class WhiteboardGateway
     },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     // Track how many test cases passed so it can be saved on session end
     if (data.output?.type === 'tests' && Array.isArray(data.output.results)) {
       const passed = data.output.results.filter((r) => r.passed).length;
       this.sessionsService.updateTestCasesPassed(data.sessionId, passed);
     }
+
     client.to(data.sessionId).emit('code:result', { output: data.output });
   }
 
@@ -268,6 +287,7 @@ export class WhiteboardGateway
     data: { sessionId: string; userId: string; line: number; col: number },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client.to(data.sessionId).emit('cursor:update', {
       userId: data.userId,
       line: data.line,
@@ -280,6 +300,7 @@ export class WhiteboardGateway
     @MessageBody() data: { sessionId: string },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client.to(data.sessionId).emit('endSession:request');
   }
 
@@ -288,13 +309,16 @@ export class WhiteboardGateway
     @MessageBody() data: { sessionId: string },
     @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     client.to(data.sessionId).emit('endSession:decline');
   }
 
   @SubscribeMessage('whiteboard:screenshot')
   handleWhiteboardScreenshot(
     @MessageBody() data: { sessionId: string; screenshot: string },
+    @ConnectedSocket() client: Socket,
   ) {
+    this.assertSocketInSession(client, data.sessionId);
     this.sessionsService.setWhiteboardScreenshot(
       data.sessionId,
       data.screenshot,
@@ -302,8 +326,27 @@ export class WhiteboardGateway
   }
 
   @SubscribeMessage('endSession:approve')
-  async handleEndSessionApprove(@MessageBody() data: { sessionId: string }) {
-    await this.sessionsService.endSession(data.sessionId);
-    this.server.to(data.sessionId).emit('endSession:confirmed');
+  async handleEndSessionApprove(
+    @MessageBody() data: { sessionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    const result = await this.sessionsService.endSession(data.sessionId);
+    console.log(
+      `[endSession:approve] result for session ${data.sessionId}:`,
+      JSON.stringify(result),
+    );
+    if (result !== null && result !== undefined && 'blocked' in result) {
+      console.log(
+        `[endSession:approve] Redis down — emitting endSession:blocked to room ${data.sessionId}`,
+      );
+      this.server.to(data.sessionId).emit('endSession:blocked', {
+        reason: 'redis_unavailable',
+        message: 'Unable to save session data. Retrying automatically...',
+        retryDurationMs: 30000,
+      });
+      this.sessionsService.startPendingEndRetry(data.sessionId);
+    }
+    // endSession:confirmed is emitted by sessionsService.endSession() on success
   }
 }
