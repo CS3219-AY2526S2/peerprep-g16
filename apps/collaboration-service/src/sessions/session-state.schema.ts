@@ -18,6 +18,15 @@ export class SessionState {
   questionId?: string;
 
   @Prop()
+  questionTitle?: string;
+
+  @Prop({ type: [String] })
+  questionTopics?: string[];
+
+  @Prop()
+  questionDifficulty?: string;
+
+  @Prop()
   language?: string;
 
   @Prop()
@@ -31,6 +40,9 @@ export class SessionState {
 
   @Prop({ type: Object })
   whiteboardState?: Record<string, unknown>;
+
+  @Prop()
+  whiteboardScreenshot?: string;
 
   @Prop({ enum: ['active', 'ended'], default: 'active' })
   status: string;

@@ -102,6 +102,13 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     this.redis.on('error', (err) =>
       this.logger.error(`Redis error: ${err.message}`),
     );
+    this.redis.on('ready', () => {
+      this.logger.log('Redis reconnected — running recovery immediately');
+      void this.recoverUnpublishedSessions().catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.error(`On-reconnect recovery failed: ${message}`);
+      });
+    });
   }
 
   async onModuleInit() {
@@ -134,7 +141,8 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.recoveryInterval) clearInterval(this.recoveryInterval);
-    for (const timer of this.pendingEndRetryTimers.values()) clearInterval(timer);
+    for (const timer of this.pendingEndRetryTimers.values())
+      clearInterval(timer);
     for (const timer of this.questionTimeouts.values()) clearTimeout(timer);
     for (const timer of this.idleTimers.values()) clearTimeout(timer);
     for (const timer of this.stateSaveTimers.values()) clearTimeout(timer);
@@ -184,6 +192,18 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         const session = JSON.parse(raw) as Session;
         if (session.status === 'ended') {
           await this.redis.del(key);
+          continue;
+        }
+        // Cross-check MongoDB: Redis may have a stale 'active' key for a session
+        // that ended while Redis was down (del failed at that time)
+        const mongoDoc = await this.sessionStateModel
+          .findOne({ sessionId: session.sessionId }, { status: 1 })
+          .lean();
+        if (mongoDoc?.status === 'ended') {
+          await this.redis.del(key);
+          this.logger.log(
+            `Discarded stale Redis key for ended session ${session.sessionId}`,
+          );
           continue;
         }
         this.sessions.set(session.sessionId, session);
@@ -317,7 +337,9 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
   async endSession(
     sessionId: string,
     opts?: { forceBypassRedis?: boolean; suppressConfirmedEmit?: boolean },
-  ): Promise<Session | { blocked: true; reason: 'redis_unavailable' } | undefined> {
+  ): Promise<
+    Session | { blocked: true; reason: 'redis_unavailable' } | undefined
+  > {
     const session = this.sessions.get(sessionId);
     if (!session || session.status === 'ended') return undefined;
 
@@ -590,11 +612,15 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             user1Id: session.userAId,
             user2Id: session.userBId,
             questionId: session.question?.questionId ?? undefined,
+            questionTitle: session.question?.title ?? undefined,
+            questionTopics: session.question?.topic ?? undefined,
+            questionDifficulty: session.question?.difficulty ?? undefined,
             language: session.language,
             code: session.code,
             hintsUsed: session.revealedHints,
             testCasesPassed: session.testCasesPassed,
             whiteboardState: { elements: session.whiteboardElements },
+            whiteboardScreenshot: session.whiteboardScreenshot ?? undefined,
             status: session.status === 'ended' ? 'ended' : 'active',
             startedAt: session.createdAt,
             lastSavedAt: new Date(),
@@ -632,7 +658,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
   private async recoverUnpublishedSessions(): Promise<void> {
     try {
-      const cutoff = new Date(Date.now() - 60 * 1000);
+      const cutoff = new Date(Date.now() - 5 * 1000);
       const unpublished = await this.sessionStateModel.find({
         status: 'ended',
         publishedToStream: false,
@@ -652,10 +678,15 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
           matchId: doc.sessionId,
           topic: '',
           question: doc.questionId
-            ? ({ questionId: doc.questionId } as Question)
+            ? ({
+                questionId: doc.questionId,
+                title: doc.questionTitle ?? '',
+                topic: doc.questionTopics ?? [],
+                difficulty: doc.questionDifficulty ?? '',
+              } as Question)
             : null,
           whiteboardElements: [],
-          whiteboardScreenshot: undefined,
+          whiteboardScreenshot: doc.whiteboardScreenshot ?? undefined,
           code: doc.code ?? '',
           language: doc.language ?? 'python',
           revealedHints: doc.hintsUsed,
@@ -670,6 +701,16 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             { sessionId: doc.sessionId },
             { $set: { publishedToStream: true } },
           );
+          // Remove stale Redis key — it may still exist with status 'active'
+          // if the session ended while Redis was down
+          try {
+            await this.redis.del(`${REDIS_PREFIX}${doc.sessionId}`);
+          } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.warn(
+              `Failed to clean up Redis key for recovered session ${doc.sessionId}: ${message}`,
+            );
+          }
           this.logger.log(`Recovered and republished session ${doc.sessionId}`);
         }
       }
@@ -853,6 +894,17 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
           (session.userAId === userId || session.userBId === userId) &&
           session.status === 'active'
         ) {
+          // Cross-check MongoDB: if the session isn't in memory, the Redis key
+          // may be stale (e.g. ended while Redis was down, del failed)
+          if (!this.sessions.has(session.sessionId)) {
+            const mongoDoc = await this.sessionStateModel
+              .findOne({ sessionId: session.sessionId }, { status: 1 })
+              .lean();
+            if (mongoDoc?.status === 'ended') {
+              await this.redis.del(key).catch(() => {});
+              continue;
+            }
+          }
           const otherUserId =
             session.userAId === userId ? session.userBId : session.userAId;
           return {
