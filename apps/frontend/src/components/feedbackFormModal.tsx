@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { submitFeedback } from '../api/feedbackService';
 import styles from './styles';
 
@@ -41,8 +42,11 @@ function FeedbackFormModal({
       setComment('');
       setCategory('');
       if (onSuccess) onSuccess();
-    } catch (error: any) {
-      setError(error.response?.data?.message || 'Failed to submit feedback.');
+    } catch (error: unknown) {
+      const message = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : undefined;
+      setError(message || 'Failed to submit feedback.');
     } finally {
       setSubmitting(false);
     }

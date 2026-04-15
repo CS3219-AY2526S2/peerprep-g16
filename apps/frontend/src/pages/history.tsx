@@ -4,6 +4,14 @@ import type { Attempt } from "../types/attempt";
 import { fetchUserAttempts } from "../api/attemptService";
 import styles from "../components/styles";
 
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
 const DEFAULT_PAGE_SIZE = 25;
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
@@ -37,9 +45,10 @@ function History() {
 
         const data = await fetchUserAttempts(userId, token);
         setAttempts(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
+        const apiError = err as ApiError;
         setError(
-          err.response?.data?.message || "Failed to load attempt history.",
+          apiError.response?.data?.message || "Failed to load attempt history.",
         );
       } finally {
         setIsLoading(false);

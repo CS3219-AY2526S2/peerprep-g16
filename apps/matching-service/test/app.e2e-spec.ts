@@ -12,11 +12,11 @@ class InMemoryRedis {
   hashes = new Map<string, Record<string, string>>();
   sortedSets = new Map<string, Array<{ score: number; member: string }>>();
 
-  async hgetall(key: string) {
-    return this.hashes.get(key) ?? {};
+  hgetall(key: string) {
+    return Promise.resolve(this.hashes.get(key) ?? {});
   }
 
-  async hset(key: string, fields: string[]) {
+  hset(key: string, fields: string[]) {
     const existing = this.hashes.get(key) ?? {};
 
     for (let index = 0; index < fields.length; index += 2) {
@@ -24,10 +24,10 @@ class InMemoryRedis {
     }
 
     this.hashes.set(key, existing);
-    return fields.length / 2;
+    return Promise.resolve(fields.length / 2);
   }
 
-  async zadd(key: string, score: number, member: string) {
+  zadd(key: string, score: number, member: string) {
     const current = this.sortedSets.get(key) ?? [];
     const existing = current.filter((item) => item.member !== member);
 
@@ -35,14 +35,16 @@ class InMemoryRedis {
     existing.sort((a, b) => a.score - b.score);
     this.sortedSets.set(key, existing);
 
-    return 1;
+    return Promise.resolve(1);
   }
 
-  async zrange(key: string) {
-    return (this.sortedSets.get(key) ?? []).map((item) => item.member);
+  zrange(key: string) {
+    return Promise.resolve(
+      (this.sortedSets.get(key) ?? []).map((item) => item.member),
+    );
   }
 
-  async zrem(key: string, member: string) {
+  zrem(key: string, member: string) {
     const existing = this.sortedSets.get(key) ?? [];
 
     this.sortedSets.set(
@@ -50,19 +52,23 @@ class InMemoryRedis {
       existing.filter((item) => item.member !== member),
     );
 
-    return 1;
+    return Promise.resolve(1);
   }
 
-  async del(key: string) {
+  del(key: string) {
     this.hashes.delete(key);
     this.sortedSets.delete(key);
-    return 1;
+    return Promise.resolve(1);
   }
 
-  async expire() {
-    return 1;
+  expire() {
+    return Promise.resolve(1);
   }
 }
+
+type MatchResponseBody = {
+  status: string;
+};
 
 describe('matching-service integration', () => {
   let app: INestApplication<App>;
@@ -127,7 +133,7 @@ describe('matching-service integration', () => {
       })
       .expect(201)
       .expect(({ body }) => {
-        expect(body.status).toBe('already_in_queue');
+        expect((body as MatchResponseBody).status).toBe('already_in_queue');
       });
   });
 
@@ -150,7 +156,7 @@ describe('matching-service integration', () => {
       .get('/api/match/user-a')
       .expect(200);
 
-    expect(firstStatus.body).toMatchObject({
+    expect(firstStatus.body as MatchResponseBody).toMatchObject({
       status: 'matched',
       roomId: 'match-id-1',
       matchedWith: { userId: 'user-b', username: 'bob' },
@@ -171,7 +177,7 @@ describe('matching-service integration', () => {
       .get('/api/match/user-b')
       .expect(200);
 
-    expect(secondStatus.body).toMatchObject({
+    expect(secondStatus.body as MatchResponseBody).toMatchObject({
       status: 'matched',
       roomId: 'match-id-1',
       matchedWith: { userId: 'user-a', username: 'alice' },
@@ -202,7 +208,7 @@ describe('matching-service integration', () => {
       .get('/api/match/user-a')
       .expect(200)
       .expect(({ body }) => {
-        expect(body.status).toBe('not_in_queue');
+        expect((body as MatchResponseBody).status).toBe('not_in_queue');
       });
   });
 });

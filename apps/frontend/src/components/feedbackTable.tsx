@@ -1,15 +1,30 @@
 import React from 'react';
 import styles from './styles';
 
+export interface Feedback {
+  _id: string;
+  questionId: string;
+  userId: string;
+  category: string;
+  comment: string;
+  status: string;
+}
+
+interface FeedbackQuestion {
+  questionId: string;
+  title: string;
+  difficulty: string;
+}
+
 interface FeedbackTableProps {
-  feedbacks: any[];
-  questions: any[];
+  feedbacks: Feedback[];
+  questions: FeedbackQuestion[];
   feedbackError: string;
   feedbackSuccess: string;
   handleResolveFeedback: (id: string) => void;
   handleReviewFeedback: (id: string) => void;
   handleDeleteFeedback: (id: string) => void;
-  handleEditQuestionFromFeedback: (feedback: any) => void;
+  handleEditQuestionFromFeedback: (feedback: Feedback) => void;
 }
 
 function FeedbackTable({

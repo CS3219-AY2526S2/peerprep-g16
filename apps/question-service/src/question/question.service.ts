@@ -13,6 +13,15 @@ type QuestionFilter = {
   questionId?: { $nin: string[] };
 };
 
+type DuplicateKeyError = {
+  code?: number;
+};
+
+type ValidationError = {
+  name?: string;
+  errors?: Record<string, { path: string }>;
+};
+
 /**
  * Service layer for question-related business logic.
  * Handles database interaction for creating and retrieving questions.
@@ -72,24 +81,25 @@ export class QuestionService {
    * @param createQuestionDto Request payload containing question data
    * @returns Promise resolving to the newly created question
    */
-  async create(createQuestionDto: any) {
+  async create(createQuestionDto: CreateQuestionDto) {
     try {
       const createdQuestion = new this.questionModel(createQuestionDto);
       return await createdQuestion.save();
     } catch (error: unknown) {
       if (typeof error === 'object' && error !== null) {
-        if ('code' in error && (error as any).code === 11000) {
+        const duplicateKeyError = error as DuplicateKeyError;
+        if (duplicateKeyError.code === 11000) {
           throw new ConflictException(
             `Question ${createQuestionDto.questionId} already exists`,
           );
         }
+        const validationError = error as ValidationError;
         if (
-          'name' in error &&
-          (error as any).name === 'ValidationError' &&
-          'errors' in error
+          validationError.name === 'ValidationError' &&
+          validationError.errors
         ) {
-          const fields = Object.values((error as any).errors).map(
-            (e: any) => e.path,
+          const fields = Object.values(validationError.errors).map(
+            (e) => e.path,
           );
           throw new BadRequestException(
             `Missing required fields: ${fields.join(', ')}`,

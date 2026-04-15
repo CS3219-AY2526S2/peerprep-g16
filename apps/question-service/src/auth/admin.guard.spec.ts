@@ -22,7 +22,10 @@ type MockRequest = {
 type IsTokenRevokedFn = (userId: string, issuedAt?: number) => Promise<boolean>;
 
 type MockPrivilegeRevocationService = {
-  isTokenRevoked: jest.Mock<ReturnType<IsTokenRevokedFn>, Parameters<IsTokenRevokedFn>>;
+  isTokenRevoked: jest.Mock<
+    ReturnType<IsTokenRevokedFn>,
+    Parameters<IsTokenRevokedFn>
+  >;
 };
 
 type VerifyFn = (token: string, secret: string) => MockUser;

@@ -4,6 +4,14 @@ import { fetchUserAttempt } from "../api/attemptService";
 import type { Attempt } from "../types/attempt";
 import { fetchQuestion, type Question } from "../api/questionService";
 
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
 function bufferToDataUrl(buffer?: { type: "Buffer"; data: number[] }) {
   if (!buffer?.data?.length) return "";
 
@@ -53,8 +61,9 @@ function AttemptReview() {
           console.warn("Failed to load question details:", questionErr);
           setQuestion(null);
         }
-      } catch (err: any) {
-        setError(err.response?.data?.message || "Failed to load attempt.");
+      } catch (err: unknown) {
+        const apiError = err as ApiError;
+        setError(apiError.response?.data?.message || "Failed to load attempt.");
       } finally {
         setIsLoading(false);
       }

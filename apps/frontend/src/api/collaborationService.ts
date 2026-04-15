@@ -1,4 +1,5 @@
 import { io, Socket } from "socket.io-client";
+import axios from "axios";
 import api from "./axiosInstance";
 
 const COLLAB_URL = import.meta.env.VITE_COLLABORATION_SERVICE_URL as string;
@@ -33,10 +34,10 @@ export async function fetchSession(sessionId: string) {
     try {
         const res = await api.get(`${COLLAB_URL}/sessions/${sessionId}`);
         return res.data;
-    } catch (err: any) {
-        if (err.response?.status === 401) throw new Error("UNAUTHORIZED");
-        if (err.response?.status === 403) throw new Error("FORBIDDEN");
-        if (err.response?.status === 404) throw new Error("NOT_FOUND");
+    } catch (err: unknown) {
+        if (axios.isAxiosError(err) && err.response?.status === 401) throw new Error("UNAUTHORIZED");
+        if (axios.isAxiosError(err) && err.response?.status === 403) throw new Error("FORBIDDEN");
+        if (axios.isAxiosError(err) && err.response?.status === 404) throw new Error("NOT_FOUND");
         throw new Error("Failed to fetch session");
     }
 }
@@ -45,9 +46,9 @@ export async function endSession(sessionId: string) {
     try {
         const res = await api.post(`${COLLAB_URL}/sessions/${sessionId}/end`);
         return res.data;
-    } catch (err: any) {
-        if (err.response?.status === 401) throw new Error("UNAUTHORIZED");
-        if (err.response?.status === 403) throw new Error("FORBIDDEN");
+    } catch (err: unknown) {
+        if (axios.isAxiosError(err) && err.response?.status === 401) throw new Error("UNAUTHORIZED");
+        if (axios.isAxiosError(err) && err.response?.status === 403) throw new Error("FORBIDDEN");
         throw new Error("Failed to end session");
     }
 }

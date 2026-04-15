@@ -29,6 +29,11 @@ type Question = {
     };
 };
 
+type SessionResponse = {
+    status: "active" | "waiting" | string;
+    question?: Question;
+};
+
 function Collaboration() {
     const { sessionId: matchingId } = useParams<{ sessionId: string }>();
     const stored = localStorage.getItem("login");
@@ -51,16 +56,16 @@ function Collaboration() {
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
     const isEndSessionButtonDisabled = endSessionState !== "idle" || incomingEndRequest;
 
-    if (!matchingId || !user) return <Navigate to="/" replace />;
-
     useEffect(() => {
+        if (!matchingId || !userId) return;
+
         let mounted = true;
 
         const bootstrap = async () => {
             try {
                 setConnectionState("Connecting");
 
-                const session = await fetchSession(matchingId);
+                const session = await fetchSession(matchingId) as SessionResponse;
 
                 if (session.status === "active" && session.question) {
                     if (mounted) {
@@ -120,12 +125,13 @@ function Collaboration() {
                     });
                 }
 
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error("Collaboration bootstrap failed", err);
                 if (
-                    err.message === "UNAUTHORIZED" ||
-                    err.message === "FORBIDDEN" ||
-                    err.message === "NOT_FOUND"
+                    err instanceof Error &&
+                    (err.message === "UNAUTHORIZED" ||
+                        err.message === "FORBIDDEN" ||
+                        err.message === "NOT_FOUND")
                 ) {
                     window.location.href = "/homepage";
                     return;
@@ -176,6 +182,8 @@ function Collaboration() {
         if (!question) return COLORS.Hard;
         return COLORS[question.difficulty];
     }, [question]);
+
+    if (!matchingId || !user) return <Navigate to="/" replace />;
 
     return (
         <div style={styles.page}>
@@ -265,7 +273,7 @@ function Collaboration() {
                                         </span>
                                     )}
                                     {question?.topic && (
-                                        question?.topic.map(x => <span style={styles.tag}>{x}</span>)
+                                        question?.topic.map(x => <span key={x} style={styles.tag}>{x}</span>)
                                     )}
                                 </div>
                             </div>
@@ -335,9 +343,9 @@ function Collaboration() {
                 </div>
             </div>
             <FeedbackFormModal
-            show={showFeedbackModal}
-            questionId={question?.questionId || ""}
-            onClose={() => setShowFeedbackModal(false)}
+                show={showFeedbackModal}
+                questionId={question?.questionId || ""}
+                onClose={() => setShowFeedbackModal(false)}
             />
         </div>
     );

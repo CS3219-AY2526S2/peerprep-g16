@@ -29,6 +29,7 @@ export async function createUser(req, res) {
 
       // Password validation
       const passwordRegex =
+        // eslint-disable-next-line no-useless-escape
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
       if (!passwordRegex.test(password)) {
         return res.status(400).json({
@@ -113,12 +114,10 @@ export async function updateUser(req, res) {
     const { username, email, password, currentPassword } = req.body;
 
     if (!username && !email && !password) {
-      return res
-        .status(400)
-        .json({
-          message:
-            'No field to update: username, email and password are all missing!',
-        });
+      return res.status(400).json({
+        message:
+          'No field to update: username, email and password are all missing!',
+      });
     }
 
     const userId = req.params.id;
@@ -170,14 +169,13 @@ export async function updateUser(req, res) {
     let hashedPassword;
     if (password) {
       const passwordRegex =
+        // eslint-disable-next-line no-useless-escape
         /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
       if (!passwordRegex.test(password)) {
-        return res
-          .status(400)
-          .json({
-            message:
-              'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character',
-          });
+        return res.status(400).json({
+          message:
+            'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character',
+        });
       }
       const salt = bcrypt.genSaltSync(10);
       hashedPassword = bcrypt.hashSync(password, salt);

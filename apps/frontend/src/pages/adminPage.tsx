@@ -6,7 +6,7 @@ import QuestionTable from "../components/questionTable";
 import AddQuestionModal from "../components/addQuestionModal";
 import EditQuestionModal from "../components/editQuestionModal";
 import styles from "../components/styles";
-import FeedbackTable from "../components/feedbackTable";
+import FeedbackTable, { type Feedback } from "../components/feedbackTable";
 import { getAllFeedback } from "../api/feedbackService";
 import UploadJSONFile from "../components/uploadJSONFile";
 
@@ -73,7 +73,7 @@ function AdminPage() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [filterDifficulty, setFilterDifficulty] = useState("all");
   const [showAddQuestion, setShowAddQuestion] = useState(false);
-  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [feedbackSuccess, setFeedbackSuccess] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
   const [showJSONUpload, setShowJSONUpload] = useState(false);
@@ -134,7 +134,7 @@ function AdminPage() {
     try {
       const data = await getAllFeedback();
       setFeedbacks(data);
-    } catch (error: any) {
+    } catch {
       setFeedbackError("Failed to fetch feedback.");
     }
   }, []);
@@ -149,7 +149,7 @@ function AdminPage() {
         );
         setFeedbackSuccess("Feedback marked as reviewed.");
         await fetchFeedback();
-      } catch (error: any) {
+      } catch {
         setFeedbackError("Failed to update feedback.");
       }
     },
@@ -166,7 +166,7 @@ function AdminPage() {
         );
         setFeedbackSuccess("Feedback marked as resolved.");
         await fetchFeedback();
-      } catch (error: any) {
+      } catch {
         setFeedbackError("Failed to update feedback.");
       }
     },
@@ -186,7 +186,7 @@ function AdminPage() {
         });
         setFeedbackSuccess("Feedback deleted successfully.");
         await fetchFeedback();
-      } catch (error: any) {
+      } catch {
         setFeedbackError("Failed to delete feedback.");
       }
     },
@@ -194,7 +194,7 @@ function AdminPage() {
   );
 
   const handleEditQuestionFromFeedback = React.useCallback(
-    (feedback: any) => {
+    (feedback: Feedback) => {
       const fullQuestion = questions.find(
         (q) => q.questionId === feedback.questionId,
       );
@@ -217,12 +217,14 @@ function AdminPage() {
   // ===== USEEFFECT HOOKS =====
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
     fetchQuestions();
     fetchFeedback();
   }, [fetchUsers, fetchQuestions, fetchFeedback]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUserSuccess("");
     setUserError("");
     setQuestionSuccess("");

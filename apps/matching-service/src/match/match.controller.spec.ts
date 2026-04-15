@@ -76,7 +76,7 @@ describe('MatchController', () => {
         userId: 'user-a',
         username: 'Alice',
         topic: 'Arrays',
-      } as any);
+      } as Parameters<MatchController['joinQueue']>[0]);
 
       expect(matchService.joinQueue).toHaveBeenCalledWith(
         'user-a',

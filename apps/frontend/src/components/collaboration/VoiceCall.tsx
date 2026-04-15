@@ -21,6 +21,17 @@ export default function VoiceCall({ socket, sessionId }: VoiceCallProps) {
     const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
     const pendingOfferRef = useRef<RTCSessionDescriptionInit | null>(null);
 
+    function cleanup() {
+        pcRef.current?.close();
+        pcRef.current = null;
+        localStreamRef.current?.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+        if (remoteAudioRef.current) {
+            remoteAudioRef.current.srcObject = null;
+        }
+        setIsMuted(false);
+    }
+
     useEffect(() => {
         if (!socket) return;
 
@@ -68,17 +79,6 @@ export default function VoiceCall({ socket, sessionId }: VoiceCallProps) {
             socket.off("voice:end", handleEnd);
         };
     }, [socket]);
-
-    function cleanup() {
-        pcRef.current?.close();
-        pcRef.current = null;
-        localStreamRef.current?.getTracks().forEach((t) => t.stop());
-        localStreamRef.current = null;
-        if (remoteAudioRef.current) {
-            remoteAudioRef.current.srcObject = null;
-        }
-        setIsMuted(false);
-    }
 
     async function createPeerConnection(): Promise<RTCPeerConnection> {
         const pc = new RTCPeerConnection(ICE_SERVERS);
