@@ -53,6 +53,10 @@ const AttemptModelSchema = new Schema(
       type: Date,
       default: Date.now,
     },
+    code: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true },
 );

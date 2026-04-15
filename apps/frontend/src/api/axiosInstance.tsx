@@ -35,7 +35,7 @@ api.interceptors.response.use(
       }
 
       try {
-        const res = await axios.post("http://localhost:3001/auth/refresh", {
+        const res = await axios.post(`${import.meta.env.VITE_USER_SERVICE_URL}/auth/refresh`, {
           refreshToken,
         });
 

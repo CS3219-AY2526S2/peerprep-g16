@@ -29,7 +29,7 @@ export async function createUser(req, res) {
 
       // Password validation
       const passwordRegex =
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-={};':"|,.<>?]).{8,}$/;
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
       if (!passwordRegex.test(password)) {
         return res.status(400).json({
           message:
@@ -113,10 +113,12 @@ export async function updateUser(req, res) {
     const { username, email, password, currentPassword } = req.body;
 
     if (!username && !email && !password) {
-      return res.status(400).json({
-        message:
-          'No field to update: username, email and password are all missing!',
-      });
+      return res
+        .status(400)
+        .json({
+          message:
+            'No field to update: username, email and password are all missing!',
+        });
     }
 
     const userId = req.params.id;
@@ -168,12 +170,14 @@ export async function updateUser(req, res) {
     let hashedPassword;
     if (password) {
       const passwordRegex =
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-={};':"|,.<>?]).{8,}$/;
+        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]).{8,}$/;
       if (!passwordRegex.test(password)) {
-        return res.status(400).json({
-          message:
-            'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character',
-        });
+        return res
+          .status(400)
+          .json({
+            message:
+              'Password must be at least 8 characters long and contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character',
+          });
       }
       const salt = bcrypt.genSaltSync(10);
       hashedPassword = bcrypt.hashSync(password, salt);
@@ -325,6 +329,41 @@ export async function getUserAttempts(req, res) {
     return res
       .status(500)
       .json({ message: 'Unknown error when getting attempts!' });
+  }
+}
+
+export async function getUserAttemptById(req, res) {
+  try {
+    const userId = req.params.id;
+    const attemptId = req.params.attemptId;
+
+    if (!isValidObjectId(userId) || !isValidObjectId(attemptId)) {
+      return res.status(404).json({ message: 'Attempt not found' });
+    }
+
+    const user = await _findUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: `User ${userId} not found` });
+    }
+
+    const attempt = await AttemptModel.findOne({
+      _id: attemptId,
+      userId,
+    });
+
+    if (!attempt) {
+      return res.status(404).json({ message: 'Attempt not found' });
+    }
+
+    return res.status(200).json({
+      message: `Found attempt ${attemptId}`,
+      data: attempt,
+    });
+  } catch (err) {
+    console.error(err);
+    return res
+      .status(500)
+      .json({ message: 'Unknown error when getting attempt!' });
   }
 }
 

@@ -9,6 +9,7 @@ import {
   getUserHistory,
   updateUser,
   updateUserPrivilege,
+  getUserAttemptById,
 } from '../controller/user-controller.js';
 
 import {
@@ -38,6 +39,13 @@ router.get(
   verifyAccessToken,
   verifyIsOwnerOrAdmin,
   getUserAttempts,
+);
+
+router.get(
+  '/:id/attempts/:attemptId',
+  verifyAccessToken,
+  verifyIsOwnerOrAdmin,
+  getUserAttemptById,
 );
 
 router.get('/:id', verifyAccessToken, verifyIsOwnerOrAdmin, getUser);

@@ -30,34 +30,134 @@ interface CodeSpaceProps {
 
 const STARTER_CODE = `# Write your solution here\n`;
 
-function generateStarterCode(questionId: string, testCases: TestCase[]): string {
-    const fnName = questionId.replace(/-/g, "_");
-    const firstInput = String(testCases[0]?.input ?? "");
-    const lines = firstInput.split("\n").filter(Boolean);
+// ─── Input parser ─────────────────────────────────────────────────────────────
 
-    if (lines.length === 0) return STARTER_CODE;
+interface ParsedVar { name: string; value: any; }
 
-    const params = lines.map((_, i) => `arg${i + 1}`);
-    const parseLines = lines.map((line, i) => {
-        const tokens = line.trim().split(/\s+/);
-        if (tokens.length > 1 && tokens.every(t => !isNaN(Number(t)))) {
-            return `${params[i]} = list(map(int, input().split()))`;
-        }
-        if (tokens.length === 1 && !isNaN(Number(tokens[0]))) {
-            return `${params[i]} = int(input())`;
-        }
-        return `${params[i]} = input()`;
+/** Split by top-level commas, ignoring commas inside brackets/strings. */
+function splitTopLevel(s: string): string[] {
+    const segs: string[] = [];
+    let depth = 0, start = 0, inStr = false, strChar = '';
+    for (let i = 0; i < s.length; i++) {
+        const c = s[i];
+        if (inStr) { if (c === strChar && s[i - 1] !== '\\') inStr = false; }
+        else if (c === '"' || c === "'") { inStr = true; strChar = c; }
+        else if ('[({'.includes(c)) depth++;
+        else if ('])}'.includes(c)) depth--;
+        else if (c === ',' && depth === 0) { segs.push(s.slice(start, i).trim()); start = i + 1; }
+    }
+    segs.push(s.slice(start).trim());
+    return segs.filter(Boolean);
+}
+
+/** Parse a raw value string (array, number, bool, string) into a JS value. */
+function parseValue(raw: string): any {
+    const s = raw.trim();
+    if (!s) return '';
+    try {
+        return JSON.parse(
+            s.replace(/\bTrue\b/g, 'true')
+             .replace(/\bFalse\b/g, 'false')
+             .replace(/\bNone\b/g, 'null')
+             .replace(/'/g, '"'),
+        );
+    } catch {
+        if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")))
+            return s.slice(1, -1);
+        return s;
+    }
+}
+
+/**
+ * Parse "nums = [-1,0,3], target = 9" → [{name:"nums", value:[-1,0,3]}, {name:"target", value:9}]
+ */
+function parseInputString(input: unknown): ParsedVar[] {
+    if (typeof input !== 'string') return [];
+    if (!input.trim()) return [];
+    return splitTopLevel(input.trim()).flatMap(seg => {
+        const eq = seg.indexOf('=');
+        if (eq === -1) return [];
+        const name = seg.slice(0, eq).trim();
+        return /^\w+$/.test(name) ? [{ name, value: parseValue(seg.slice(eq + 1).trim()) }] : [];
     });
+}
 
-    return [
-        ...parseLines,
-        "",
-        `def ${fnName}(${params.join(", ")}):`,
-        "    pass",
-        "",
-        `print(${fnName}(${params.join(", ")}))`,
-        "",
-    ].join("\n");
+/** Convert a JS value to a valid Python literal. */
+function toPythonLiteral(v: any): string {
+    if (v === null || v === undefined) return 'None';
+    if (v === true) return 'True';
+    if (v === false) return 'False';
+    if (typeof v === 'string') return JSON.stringify(v);
+    if (typeof v === 'number') return String(v);
+    if (Array.isArray(v)) return `[${v.map(toPythonLiteral).join(', ')}]`;
+    if (typeof v === 'object') {
+        const pairs = Object.entries(v).map(([k, val]) => `${JSON.stringify(k)}: ${toPythonLiteral(val)}`);
+        return `{${pairs.join(', ')}}`;
+    }
+    return String(v);
+}
+
+/**
+ * Build a test harness snippet that injects parsed variables and calls the function.
+ * Returns '' for languages we can't auto-harness (Java, C++).
+ */
+function buildTestHarness(vars: ParsedVar[], fnName: string, language: string): string {
+    const args = vars.map(v => v.name).join(', ');
+    if (language === 'python') {
+        const lines = vars.map(v => `${v.name} = ${toPythonLiteral(v.value)}`);
+        return ['\n# --- test harness ---', ...lines, `_result = ${fnName}(${args})`, 'print(_result)'].join('\n');
+    }
+    if (language === 'javascript' || language === 'typescript') {
+        const lines = vars.map(v => `const ${v.name} = ${JSON.stringify(v.value)};`);
+        return ['\n// --- test harness ---', ...lines, `const _result = ${fnName}(${args});`, 'console.log(JSON.stringify(_result));'].join('\n');
+    }
+    return '';
+}
+
+/** Try to extract the first function name defined in the user's code. */
+function extractFnName(code: string, language: string): string | null {
+    if (language === 'python') return code.match(/^def\s+(\w+)\s*\(/m)?.[1] ?? null;
+    if (language === 'javascript' || language === 'typescript')
+        return code.match(/(?:^function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:function|\())/m)?.[1] ?? null;
+    return null;
+}
+
+/**
+ * Compare actual vs expected output, normalising whitespace and Python/JS literal differences
+ * (e.g. "[0, 1]" matches "[0,1]", "True" matches "true").
+ */
+function outputsMatch(actual: string, expected: string): boolean {
+    const a = actual.trim(), e = expected.trim();
+    if (a === e) return true;
+    const norm = (s: string) => {
+        try {
+            return JSON.stringify(JSON.parse(
+                s.replace(/\bTrue\b/g, 'true').replace(/\bFalse\b/g, 'false').replace(/\bNone\b/g, 'null').replace(/'/g, '"'),
+            ));
+        } catch { return s; }
+    };
+    return norm(a) === norm(e);
+}
+
+// ─── Starter-code generator ───────────────────────────────────────────────────
+
+function generateStarterCode(questionId: string, testCases: TestCase[], language: string): string {
+    const vars = parseInputString(testCases[0]?.input ?? '');
+    const params = vars.map(v => v.name).join(', ');
+
+    if (language === 'python') {
+        const fn = questionId.replace(/-/g, '_');
+        return `def ${fn}(${params}):\n    pass\n`;
+    }
+    if (language === 'javascript') {
+        const fn = questionId.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        return `function ${fn}(${params}) {\n    \n}\n`;
+    }
+    if (language === 'typescript') {
+        const fn = questionId.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+        return `function ${fn}(${params}) {\n    \n}\n`;
+    }
+    return `// Write your solution here\n`;
 }
 
 
@@ -66,7 +166,7 @@ async function executeCode(
     code: string,
     stdin: string,
 ): Promise<{ stdout: string; stderr: string }> {
-    const res = await fetch("http://localhost:3003/execute", {
+    const res = await fetch(`${import.meta.env.VITE_COLLABORATION_SERVICE_URL}/execute`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ language, code, stdin }),
@@ -90,14 +190,15 @@ export default function CodeSpace({
     const [partnerCursor, setPartnerCursor] = useState<{ line: number; col: number } | null>(null);
     const hasServerCode = useRef(false);
 
-    // Auto-generate boilerplate when question loads, but only if no code was saved server-side
+    // Auto-generate boilerplate when question loads, but only if no code was saved server-side.
+    // Only update local state — never emit codeUpdate here, as the socket may buffer the message
+    // and send it after connecting, overwriting the saved code on the server.
     useEffect(() => {
         if (!questionId || testCases.length === 0) return;
         if (hasServerCode.current) return;
-        const generated = generateStarterCode(questionId, testCases);
+        const generated = generateStarterCode(questionId, testCases, language);
         setCode(generated);
-        socket?.emit("codeUpdate", { sessionId, userId, code: generated, language });
-    }, [questionId, testCases]);
+    }, [questionId, testCases]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!socket) return;
@@ -174,13 +275,26 @@ export default function CodeSpace({
             let output: RunOutput;
 
             if (testCases.length > 0) {
+                // Derive function name: prefer what the user actually defined, fall back to questionId
+                const defaultFn = questionId
+                    ? language === 'python'
+                        ? questionId.replace(/-/g, '_')
+                        : questionId.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
+                    : 'solution';
+                const fnName = extractFnName(code, language) ?? defaultFn;
+
                 const results = await Promise.all(
                     testCases.map(async (tc): Promise<TestCaseResult> => {
                         try {
-                            const { stdout, stderr } = await executeCode(language, code, tc.input);
+                            const vars = parseInputString(tc.input);
+                            const harness = buildTestHarness(vars, fnName, language);
+                            // Inject harness into code; fall back to raw stdin for unsupported languages
+                            const codeToRun = harness ? code + harness : code;
+                            const stdin = harness ? '' : tc.input;
+                            const { stdout, stderr } = await executeCode(language, codeToRun, stdin);
                             const actual = stdout.trimEnd();
                             const expected = tc.expectedOutput.trimEnd();
-                            return { input: tc.input, expected, actual, passed: actual === expected, error: stderr };
+                            return { input: tc.input, expected, actual, passed: outputsMatch(actual, expected), error: stderr };
                         } catch (err: any) {
                             return { input: tc.input, expected: tc.expectedOutput, actual: "", passed: false, error: err.message };
                         }
@@ -240,7 +354,7 @@ export default function CodeSpace({
     const runLabel = isRunning ? "Running…" : peerRunning ? "Peer running…" : "▶ Run";
 
     return (
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px", height: "100%", minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px", height: "100%", minWidth: 0, overflow: "hidden" }}>
             {/* Header */}
             <div style={styles.header}>
                 <span style={{ fontSize: "13px", fontWeight: 600, letterSpacing: "0.02em" }}>{"</>"} Code</span>
@@ -264,7 +378,7 @@ export default function CodeSpace({
                 <button onClick={onToggle} style={styles.closeBtn} title="Hide code">×</button>
             </div>
 
-            {/* Editor + output */}
+            {/* Scrollable editor + output */}
             <div style={styles.editorWrap}>
                 <textarea
                     value={code}
@@ -275,7 +389,7 @@ export default function CodeSpace({
                     style={styles.textarea}
                 />
 
-                {/* Output panel */}
+                {/* Output panel — inside the scroll container so it's always reachable */}
                 {runOutput && (
                     <div style={styles.outputPanel}>
                         {runOutput.type === "raw" ? (
@@ -400,11 +514,12 @@ const styles: Record<string, CSSProperties> = {
     textarea: {
         flex: 1, padding: "16px", background: "transparent", border: "none",
         color: "#e6edf3", fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-        fontSize: "13px", lineHeight: "1.7", resize: "none", outline: "none", minHeight: "180px",
+        fontSize: "13px", lineHeight: "1.7", resize: "none", outline: "none", overflowY: "auto",
     },
     outputPanel: {
+        flexShrink: 0, height: "200px", overflowY: "auto",
         borderTop: "1px solid #21262d", padding: "12px 16px",
-        background: "#161b22", maxHeight: "220px", overflow: "auto",
+        background: "#161b22",
     },
     pre: { margin: 0, fontSize: "12px", color: "#2a9d8f", whiteSpace: "pre-wrap", fontFamily: "monospace" },
     testRow: {

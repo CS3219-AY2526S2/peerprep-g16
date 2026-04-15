@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Request } from 'express';
-import * as jwt from 'jsonwebtoken';
+import {
+  TokenExpiredError,
+  type JwtPayload as BaseJwtPayload,
+  verify,
+} from 'jsonwebtoken';
 import { PrivilegeRevocationService } from './privilege-revocation.service';
 
 /**
@@ -21,17 +25,20 @@ type AuthenticatedRequest = Request & {
   };
 };
 
-/**
- * Expected JWT payload shape used by this service.
- *
- * `iat` and `exp` are standard JWT claims returned by `jsonwebtoken`.
- */
-type JwtPayload = {
+type AuthJwtPayload = BaseJwtPayload & {
   id: string;
   isAdmin: boolean;
-  iat?: number;
-  exp?: number;
 };
+
+function isAuthJwtPayload(
+  value: string | BaseJwtPayload,
+): value is AuthJwtPayload {
+  return (
+    typeof value !== 'string' &&
+    typeof value.id === 'string' &&
+    typeof value.isAdmin === 'boolean'
+  );
+}
 
 /**
  * Guard that ensures the requester is authenticated with a valid, non-revoked token.
@@ -73,13 +80,18 @@ export class UserGuard implements CanActivate {
     }
 
     try {
-      const payload = jwt.verify(token, secret) as JwtPayload;
-      const revoked =
-        await this.privilegeRevocationService.isTokenRevoked(
-          payload.id, 
-          payload.iat,
-        );
-      
+      const decoded = verify(token, secret);
+
+      if (!isAuthJwtPayload(decoded)) {
+        throw new UnauthorizedException('Authentication failed');
+      }
+
+      const payload = decoded;
+      const revoked = await this.privilegeRevocationService.isTokenRevoked(
+        payload.id,
+        payload.iat,
+      );
+
       if (revoked) {
         throw new UnauthorizedException({
           message: 'Privilege changed. Please log in again.',
@@ -98,10 +110,10 @@ export class UserGuard implements CanActivate {
         throw error;
       }
 
-      if (error instanceof jwt.TokenExpiredError) {
+      if (error instanceof TokenExpiredError) {
         throw new UnauthorizedException('Token expired');
       }
-      
+
       throw new UnauthorizedException('Authentication failed');
     }
   }
