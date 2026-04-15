@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { fetchUserAttempt } from "../api/attemptService";
 import type { Attempt } from "../types/attempt";
 import { fetchQuestion, type Question } from "../api/questionService";
@@ -28,6 +28,9 @@ function AttemptReview() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [question, setQuestion] = useState<Question | null>(null);
+
+  const navigate = useNavigate();
+
 
   useEffect(() => {
     if (!attemptId || !userId || !token) {
@@ -102,6 +105,19 @@ function AttemptReview() {
             }}
           >
             Code
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate(`/modelSolution/${attempt.questionId}`)}
+            style={{
+              ...styles.panelButton,
+              background: "#6a4c93",
+              color: "#fff",
+              cursor: "pointer",
+            }}
+          >
+            Model Answer
           </button>
         </div>
 
