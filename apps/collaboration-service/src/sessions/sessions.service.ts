@@ -1,7 +1,10 @@
 import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
 import { Server } from 'socket.io';
 import Redis from 'ioredis';
+import { SessionState, SessionStateDocument } from './session-state.schema';
 
 export interface Session {
     sessionId: string;
@@ -24,6 +27,7 @@ const REDIS_PREFIX = 'collab:session:';
 const FLUSH_DELAY_MS = 1000;
 const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+const STATE_SAVE_DEBOUNCE_MS = 30 * 1000; // 30 seconds
 
 const DIFFICULTY_RANK: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
 function resolveDifficulty(a: string | null, b: string | null): string | undefined {
@@ -44,8 +48,13 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     private flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private questionTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
     private idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    private readonly stateSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    private readonly initialUpsertSent = new Set<string>();
 
-    constructor(private readonly configService: ConfigService) {
+    constructor(
+        private readonly configService: ConfigService,
+        @InjectModel(SessionState.name) private readonly sessionStateModel: Model<SessionStateDocument>,
+    ) {
         const redisUrl = this.configService.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
         this.redis = new Redis(redisUrl, { lazyConnect: true });
         this.redis.on('error', (err) => this.logger.error(`Redis error: ${err.message}`));
@@ -59,11 +68,13 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         } catch (err) {
             this.logger.warn(`Could not connect to Redis — running without persistence: ${err.message}`);
         }
+        await this.recoverUnpublishedSessions();
     }
 
     async onModuleDestroy() {
         for (const timer of this.questionTimeouts.values()) clearTimeout(timer);
         for (const timer of this.idleTimers.values()) clearTimeout(timer);
+        for (const timer of this.stateSaveTimers.values()) clearTimeout(timer);
         for (const [sessionId, timer] of this.flushTimers) {
             clearTimeout(timer);
             await this.flushToRedis(sessionId);
@@ -151,6 +162,11 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         // Persist immediately so a crash right after creation doesn't lose it
         await this.flushToRedis(data.matchId);
 
+        // Write initial state to MongoDB (fire-and-forget)
+        this.saveSessionState(session).catch((err: any) =>
+            this.logger.error(`saveSessionState on create failed: ${err.message}`),
+        );
+
         // Fall back to mock question if Question Service doesn't respond in time
         const timeoutMs = this.configService.get<number>('QUESTION_TIMEOUT_MS') ?? DEFAULT_QUESTION_TIMEOUT_MS;
         const timer = setTimeout(async () => {
@@ -189,6 +205,11 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
         await this.flushToRedis(sessionId);
 
+        // Persist to MongoDB now that the question is known (fire-and-forget)
+        this.saveSessionState(session).catch((err: any) =>
+            this.logger.error(`saveSessionState after attachQuestion failed: ${err.message}`),
+        );
+
         if (this.io) {
             this.io.to(sessionId).emit('questionReady', { question });
         }
@@ -225,8 +246,28 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             this.flushTimers.delete(sessionId);
         }
 
-        await this.publishSessionCompleted(session);
+        // Cancel pending debounced MongoDB save — we'll do a final synchronous one now
+        const stateSaveTimer = this.stateSaveTimers.get(sessionId);
+        if (stateSaveTimer) {
+            clearTimeout(stateSaveTimer);
+            this.stateSaveTimers.delete(sessionId);
+        }
 
+        const endedAt = new Date();
+        // Write final state to MongoDB before publishing (publishedToStream starts false)
+        await this.saveSessionState(session, { publishedToStream: false, endedAt });
+
+        const published = await this.publishSessionCompleted(session);
+        if (published) {
+            await this.sessionStateModel.findOneAndUpdate(
+                { sessionId },
+                { $set: { publishedToStream: true } },
+            ).catch((err: any) =>
+                this.logger.error(`Failed to mark publishedToStream for ${sessionId}: ${err.message}`),
+            );
+        }
+
+        this.initialUpsertSent.delete(sessionId);
         this.sessions.delete(sessionId);
         try {
             await this.redis.del(`${REDIS_PREFIX}${sessionId}`);
@@ -253,6 +294,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         session.code = code;
         if (language) session.language = language;
         this.scheduleFlush(sessionId);
+        this.scheduleStateSave(session);
     }
 
     updateRevealedHints(sessionId: string, count: number): void {
@@ -260,6 +302,9 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         if (!session) return;
         session.revealedHints = count;
         this.scheduleFlush(sessionId);
+        this.saveSessionState(session).catch((err: any) =>
+            this.logger.error(`saveSessionState after hint update failed: ${err.message}`),
+        );
     }
 
     updateTestCasesPassed(sessionId: string, count: number): void {
@@ -267,6 +312,9 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         if (!session) return;
         session.testCasesPassed = count;
         this.scheduleFlush(sessionId);
+        this.saveSessionState(session).catch((err: any) =>
+            this.logger.error(`saveSessionState after test result failed: ${err.message}`),
+        );
     }
 
     setWhiteboardScreenshot(sessionId: string, screenshot: string): void {
@@ -357,7 +405,98 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         }
     }
 
-    private async publishSessionCompleted(session: Session): Promise<void> {
+    // ─── MongoDB session state persistence ───────────────────────────────────
+
+    private async saveSessionState(
+        session: Session,
+        extra?: { publishedToStream?: boolean; endedAt?: Date },
+    ): Promise<void> {
+        try {
+            await this.sessionStateModel.findOneAndUpdate(
+                { sessionId: session.sessionId },
+                {
+                    $set: {
+                        sessionId: session.sessionId,
+                        user1Id: session.userAId,
+                        user2Id: session.userBId,
+                        questionId: session.question?.questionId ?? undefined,
+                        language: session.language,
+                        code: session.code,
+                        hintsUsed: session.revealedHints,
+                        testCasesPassed: session.testCasesPassed,
+                        whiteboardState: { elements: session.whiteboardElements },
+                        status: session.status === 'ended' ? 'ended' : 'active',
+                        startedAt: session.createdAt,
+                        lastSavedAt: new Date(),
+                        ...(extra?.publishedToStream !== undefined && { publishedToStream: extra.publishedToStream }),
+                        ...(extra?.endedAt !== undefined && { endedAt: extra.endedAt }),
+                    },
+                },
+                { upsert: true, new: true },
+            );
+            this.initialUpsertSent.add(session.sessionId);
+        } catch (err: any) {
+            this.logger.error(`Failed to save session state for ${session.sessionId}: ${err.message}`);
+        }
+    }
+
+    private scheduleStateSave(session: Session): void {
+        const existing = this.stateSaveTimers.get(session.sessionId);
+        if (existing) clearTimeout(existing);
+        const timer = setTimeout(() => {
+            this.stateSaveTimers.delete(session.sessionId);
+            this.saveSessionState(session).catch((err: any) =>
+                this.logger.error(`Scheduled state save failed for ${session.sessionId}: ${err.message}`),
+            );
+        }, STATE_SAVE_DEBOUNCE_MS);
+        this.stateSaveTimers.set(session.sessionId, timer);
+    }
+
+    private async recoverUnpublishedSessions(): Promise<void> {
+        try {
+            const cutoff = new Date(Date.now() - 60 * 1000);
+            const unpublished = await this.sessionStateModel.find({
+                status: 'ended',
+                publishedToStream: false,
+                endedAt: { $lt: cutoff },
+            });
+
+            if (unpublished.length === 0) return;
+            this.logger.log(`Recovering ${unpublished.length} unpublished session(s)...`);
+
+            for (const doc of unpublished) {
+                const session: Session = {
+                    sessionId: doc.sessionId,
+                    userAId: doc.user1Id,
+                    userBId: doc.user2Id,
+                    matchId: doc.sessionId,
+                    topic: '',
+                    question: doc.questionId ? { questionId: doc.questionId } : null,
+                    whiteboardElements: [],
+                    whiteboardScreenshot: undefined,
+                    code: doc.code ?? '',
+                    language: doc.language ?? 'python',
+                    revealedHints: doc.hintsUsed,
+                    testCasesPassed: doc.testCasesPassed,
+                    status: 'ended',
+                    createdAt: doc.startedAt,
+                };
+
+                const published = await this.publishSessionCompleted(session);
+                if (published) {
+                    await this.sessionStateModel.findOneAndUpdate(
+                        { sessionId: doc.sessionId },
+                        { $set: { publishedToStream: true } },
+                    );
+                    this.logger.log(`Recovered and republished session ${doc.sessionId}`);
+                }
+            }
+        } catch (err: any) {
+            this.logger.error(`recoverUnpublishedSessions failed: ${err.message}`);
+        }
+    }
+
+    private async publishSessionCompleted(session: Session): Promise<boolean> {
         const duration = Date.now() - new Date(session.createdAt).getTime();
         try {
             await this.redis.xadd(
@@ -377,8 +516,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
                 'whiteboardScreenshot', session.whiteboardScreenshot ?? '',
             );
             this.logger.log(`Published session.completed for ${session.sessionId}`);
+            return true;
         } catch (err: any) {
             this.logger.warn(`Failed to publish session.completed: ${err.message}`);
+            return false;
         }
     }
 

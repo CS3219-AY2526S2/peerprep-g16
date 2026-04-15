@@ -125,6 +125,7 @@ services:
       QUESTION_SERVICE_URL: http://question-service:3002
       USER_SERVICE_URL: http://user-service:3001
       CODE_EXECUTOR_URL: http://code-executor:2358
+      MONGODB_URI: ${COLLAB_MONGODB_URI}
     depends_on:
       redis:
         condition: service_healthy
