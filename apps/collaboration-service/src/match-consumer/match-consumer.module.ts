@@ -4,7 +4,7 @@ import { MatchConsumerService } from './match-consumer.service';
 import { SessionsModule } from '../sessions/sessions.module';
 
 @Module({
-    imports: [ConfigModule, SessionsModule],
-    providers: [MatchConsumerService],
+  imports: [ConfigModule, SessionsModule],
+  providers: [MatchConsumerService],
 })
 export class MatchConsumerModule {}

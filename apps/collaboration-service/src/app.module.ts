@@ -18,4 +18,4 @@ import { MatchConsumerModule } from './match-consumer/match-consumer.module';
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule {}
