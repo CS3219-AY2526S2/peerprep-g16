@@ -34,9 +34,6 @@ describe('AddQuestionModal', () => {
   let setSampleOutput: ReturnType<typeof vi.fn>;
   let setHiddenInput: ReturnType<typeof vi.fn>;
   let setHiddenOutput: ReturnType<typeof vi.fn>;
-  let setModelAnswer: ReturnType<typeof vi.fn>;
-  let setModelAnswerTimeComplexity: ReturnType<typeof vi.fn>;
-  let setModelAnswerExplanation: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -49,9 +46,6 @@ describe('AddQuestionModal', () => {
     setSampleOutput = vi.fn();
     setHiddenInput = vi.fn();
     setHiddenOutput = vi.fn();
-    setModelAnswer = vi.fn();
-    setModelAnswerTimeComplexity = vi.fn();
-    setModelAnswerExplanation = vi.fn();
   });
 
   const renderModal = (overrides: Partial<React.ComponentProps<typeof AddQuestionModal>> = {}) =>
@@ -74,12 +68,6 @@ describe('AddQuestionModal', () => {
         setHiddenInput={setHiddenInput}
         hiddenOutput=""
         setHiddenOutput={setHiddenOutput}
-        modelAnswer=""
-        setModelAnswer={setModelAnswer}
-        modelAnswerTimeComplexity=""
-        setModelAnswerTimeComplexity={setModelAnswerTimeComplexity}
-        modelAnswerExplanation=""
-        setModelAnswerExplanation={setModelAnswerExplanation}
         handleAddQuestion={handleAddQuestion}
         questionError=""
         onClose={onClose}
