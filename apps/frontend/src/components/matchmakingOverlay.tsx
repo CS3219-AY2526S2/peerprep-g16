@@ -23,8 +23,8 @@ function MatchmakingOverlay({
   isRedirecting,
 }: Props) {
   return (
-    <div style={styles.modalOverlay}>
-      <div style={styles.modalBox}>
+    <div style={styles.overlay}>
+      <div style={styles.box}>
         {isTimeout ? (
           <>
             <h3 style={{ marginBottom: "10px", color: "red" }}>No Match Found</h3>
