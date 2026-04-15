@@ -1,6 +1,6 @@
-import bcrypt from "bcrypt";
-import { encrypt } from "../utils/encryption.js";
-import jwt from "jsonwebtoken";
+import bcrypt from 'bcrypt';
+import { encrypt } from '../utils/encryption.js';
+import jwt from 'jsonwebtoken';
 import {
   findUserByEmail as _findUserByEmail,
   findUserById as _findUserById,
@@ -8,15 +8,15 @@ import {
   incrementFailedLoginAttempts,
   lockUserAccount,
   resetFailedLoginAttempts,
-} from "../model/repository.js";
-import { formatUserResponse } from "./user-controller.js";
-import { isTokenBlacklisted } from "../services/tokenBlacklistService.js";
+} from '../model/repository.js';
+import { formatUserResponse } from './user-controller.js';
+import { isTokenBlacklisted } from '../services/tokenBlacklistService.js';
 
 export async function handleLogin(req, res) {
   const { email, password } = req.body;
 
   if (!email || !password) {
-    return res.status(400).json({ message: "Missing email and/or password" });
+    return res.status(400).json({ message: 'Missing email and/or password' });
   }
 
   try {
@@ -24,7 +24,7 @@ export async function handleLogin(req, res) {
     const user = await _findUserByEmail(encryptedEmail);
 
     if (!user) {
-      return res.status(401).json({ message: "Wrong email and/or password" });
+      return res.status(401).json({ message: 'Wrong email and/or password' });
     }
 
     // ============================================
@@ -63,7 +63,7 @@ export async function handleLogin(req, res) {
         // Lock the account!
         await lockUserAccount(user.id);
         return res.status(403).json({
-          message: "Too many failed attempts. Account locked for 15 minutes.",
+          message: 'Too many failed attempts. Account locked for 15 minutes.',
         });
       }
 
@@ -87,8 +87,8 @@ export async function handleLogin(req, res) {
       },
       process.env.JWT_SECRET,
       {
-        expiresIn: "5m",
-      }
+        expiresIn: '5m',
+      },
     );
 
     const refreshToken = jwt.sign(
@@ -97,14 +97,14 @@ export async function handleLogin(req, res) {
       },
       process.env.JWT_REFRESH_SECRET,
       {
-        expiresIn: "7d",
-      }
+        expiresIn: '7d',
+      },
     );
 
     await updateRefreshToken(user.id, refreshToken);
 
     return res.status(200).json({
-      message: "User logged in",
+      message: 'User logged in',
       data: {
         accessToken,
         refreshToken,
@@ -119,48 +119,61 @@ export async function handleLogin(req, res) {
 export async function handleVerifyToken(req, res) {
   try {
     const verifiedUser = req.user;
-    return res.status(200).json({ message: "Token verified", data: verifiedUser });
+    return res
+      .status(200)
+      .json({ message: 'Token verified', data: verifiedUser });
   } catch (err) {
     return res.status(500).json({ message: err.message });
   }
 }
 
 export async function handleRefreshToken(req, res) {
-  const { refreshToken } = req.body
-  if (!refreshToken) return res.status(401).json({ message: "No refresh token" });
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    return res.status(401).json({ message: 'No refresh token' });
+  }
 
   try {
     const payload = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
     const user = await _findUserById(payload.id);
 
     if (!user || user.refreshToken !== refreshToken) {
-      return res.status(401).json({ message: "Invalid refresh token" });
+      return res.status(401).json({ message: 'Invalid refresh token' });
     }
 
     const blacklisted = await isTokenBlacklisted(user.id, payload.iat);
     if (blacklisted) {
       return res.status(401).json({
-        message: "Session invalidated due to privilege change. Please log in again.",
-        code: "PRIVILEGE_CHANGED",
+        message:
+          'Session invalidated due to privilege change. Please log in again.',
+        code: 'PRIVILEGE_CHANGED',
       });
     }
 
     const accessToken = jwt.sign(
       { id: user.id, isAdmin: user.isAdmin },
       process.env.JWT_SECRET,
-      { expiresIn: "5m" }
+      { expiresIn: '5m' },
     );
 
-    const newRefreshToken = jwt.sign({
-      id: user.id
-    }, process.env.JWT_REFRESH_SECRET, {
-      expiresIn: "7d"
-    });
+    const newRefreshToken = jwt.sign(
+      {
+        id: user.id,
+      },
+      process.env.JWT_REFRESH_SECRET,
+      {
+        expiresIn: '7d',
+      },
+    );
 
     await updateRefreshToken(user.id, newRefreshToken);
 
-    return res.status(200).json({ data: { accessToken: accessToken, refreshToken: newRefreshToken } });
+    return res.status(200).json({
+      data: { accessToken: accessToken, refreshToken: newRefreshToken },
+    });
   } catch (err) {
-    return res.status(401).json({ message: "Invalid or expired refresh token" });
+    return res
+      .status(401)
+      .json({ message: 'Invalid or expired refresh token' });
   }
 }
