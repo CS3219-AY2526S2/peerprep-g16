@@ -53,8 +53,5 @@ export class SessionState {
 
 export const SessionStateSchema = SchemaFactory.createForClass(SessionState);
 
-// TTL index: auto-expire documents 7 days after creation
-SessionStateSchema.index(
-  { createdAt: 1 },
-  { expireAfterSeconds: 7 * 24 * 60 * 60 },
-);
+// TTL index: auto-expire documents 4 hours after creation
+SessionStateSchema.index({ createdAt: 1 }, { expireAfterSeconds: 4 * 60 * 60 });
