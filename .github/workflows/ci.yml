@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
 
+env:
+  NODE_VERSION: 20
+
 jobs:
   lint-backend:
     runs-on: ubuntu-latest
@@ -14,11 +17,6 @@ jobs:
           - apps/question-service
           - apps/matching-service
           - apps/collaboration-service
-          # Enable later when user-service has a lint script
-          # - apps/user-service
-
-          # api-gateway is excluded for now because it is not part of the current service flow
-          # - apps/api-gateway
 
     defaults:
       run:
@@ -31,19 +29,43 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
+      - name: Lint without fixing
+        run: npx eslint "{src,apps,libs,test}/**/*.ts"
+
+  lint-user-service:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/user-service
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/user-service/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint user-service
         run: npm run lint
 
-  unit-test-backend:
+  build-backend:
     runs-on: ubuntu-latest
-    needs: lint-backend
+    needs:
+      - lint-backend
     strategy:
       fail-fast: false
       matrix:
@@ -51,11 +73,6 @@ jobs:
           - apps/question-service
           - apps/matching-service
           - apps/collaboration-service
-          # Enable later when user-service has real tests
-          # - apps/user-service
-
-          # Enable later only if api-gateway becomes part of the active architecture
-          # - apps/api-gateway
 
     defaults:
       run:
@@ -68,7 +85,42 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+  unit-test-backend:
+    runs-on: ubuntu-latest
+    needs:
+      - lint-backend
+      - lint-user-service
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - apps/question-service
+          - apps/matching-service
+          - apps/collaboration-service
+          - apps/user-service
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: ${{ matrix.service }}/package-lock.json
 
@@ -77,6 +129,40 @@ jobs:
 
       - name: Run unit tests
         run: npm test -- --runInBand
+
+  e2e-test-backend:
+    runs-on: ubuntu-latest
+    needs:
+      - build-backend
+      - unit-test-backend
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - apps/question-service
+          - apps/matching-service
+          - apps/collaboration-service
+
+    defaults:
+      run:
+        working-directory: ${{ matrix.service }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: ${{ matrix.service }}/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run e2e tests
+        run: npm run test:e2e -- --runInBand
 
   frontend-checks:
     runs-on: ubuntu-latest
@@ -91,7 +177,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: apps/frontend/package-lock.json
 
@@ -101,21 +187,16 @@ jobs:
       - name: Lint frontend
         run: npm run lint
 
+      - name: Run frontend unit tests
+        run: npm test
+
       - name: Build frontend
         run: npm run build
 
-      # Enable later when frontend test scripts exist
-      # - name: Run frontend unit tests
-      #   run: npm test
-
-      # Enable later when frontend e2e tests exist
-      # - name: Run frontend e2e tests
-      #   run: npm run test:e2e
-
-  integration-test:
+  docker-smoke:
     runs-on: ubuntu-latest
     needs:
-      - unit-test-backend
+      - e2e-test-backend
       - frontend-checks
 
     steps:
@@ -124,18 +205,16 @@ jobs:
 
       - name: Create env file for compose
         run: |
-          cat > .env <<EOF
-          MONGO_USERNAME=${{ secrets.MONGO_USERNAME }}
-          MONGO_PASSWORD=${{ secrets.MONGO_PASSWORD }}
-          DB_CLOUD_URI=${{ secrets.DB_CLOUD_URI }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          JWT_REFRESH_SECRET=${{ secrets.JWT_REFRESH_SECRET }}
-          ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
-          ENCRYPTION_IV=${{ secrets.ENCRYPTION_IV }}
-          QUESTION_SERVICE_MONGODB_URI=${{ secrets.QUESTION_SERVICE_MONGODB_URI }}
-          CODE_EXECUTOR_POSTGRES_DB=${{ secrets.CODE_EXECUTOR_POSTGRES_DB }}
-          CODE_EXECUTOR_POSTGRES_USER=${{ secrets.CODE_EXECUTOR_POSTGRES_USER }}
-          CODE_EXECUTOR_POSTGRES_PASSWORD=${{ secrets.CODE_EXECUTOR_POSTGRES_PASSWORD }}
+          cat > .env <<'EOF'
+          MONGO_USERNAME=peerprep
+          MONGO_PASSWORD=peerprep_password
+          DB_CLOUD_URI=mongodb://peerprep:peerprep_password@mongodb:27017/peerprepUserServiceDB?authSource=admin
+          JWT_SECRET=ci_jwt_secret
+          JWT_REFRESH_SECRET=ci_refresh_secret
+          ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+          ENCRYPTION_IV=00000000000000000000000000000000
+          QUESTION_SERVICE_MONGODB_URI=mongodb://peerprep:peerprep_password@mongodb:27017/peerprepQuestionServiceDB?authSource=admin
+          COLLAB_MONGODB_URI=mongodb://peerprep:peerprep_password@mongodb:27017/peerprepCollaborationServiceDB?authSource=admin
           EOF
 
       - name: Build services with Docker Compose
@@ -144,27 +223,31 @@ jobs:
       - name: Start services
         run: docker compose -f compose.yml up -d
 
-      - name: Wait for containers
-        run: sleep 30
+      - name: Wait for services
+        run: |
+          for url in \
+            http://localhost:3001/health \
+            http://localhost:3002/health \
+            http://localhost:3003/health \
+            http://localhost:3004/api/match/peek/__ci__ \
+            http://localhost:2358/health \
+            http://localhost:5173
+          do
+            echo "Waiting for $url"
+            for attempt in {1..30}; do
+              if curl --fail --silent --show-error "$url" > /dev/null; then
+                break
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                echo "Service did not become ready: $url"
+                exit 1
+              fi
+              sleep 2
+            done
+          done
 
       - name: Show container status
         run: docker compose -f compose.yml ps
-
-      - name: Smoke test user-service
-        run: curl --fail http://localhost:3001/health
-
-      # Add more real integration checks later, for example:
-      # - name: Smoke test question-service
-      #   run: curl --fail http://localhost:3002
-      #
-      # - name: Smoke test collaboration-service
-      #   run: curl --fail http://localhost:3003
-      #
-      # - name: Run backend e2e tests
-      #   run: |
-      #     cd apps/question-service && npm run test:e2e
-      #     cd ../matching-service && npm run test:e2e
-      #     cd ../collaboration-service && npm run test:e2e
 
       - name: Show logs on failure
         if: failure()

@@ -1,4 +1,6 @@
 import { QuestionService } from './question.service';
+import type { Model } from 'mongoose';
+import type { QuestionDocument } from './schemas/question.schema';
 
 describe('QuestionService', () => {
   let service: QuestionService;
@@ -17,7 +19,9 @@ describe('QuestionService', () => {
       find: jest.fn(),
     };
 
-    service = new QuestionService(questionModel as any);
+    service = new QuestionService(
+      questionModel as unknown as Model<QuestionDocument>,
+    );
   });
 
   afterEach(() => {

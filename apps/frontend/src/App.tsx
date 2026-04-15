@@ -17,9 +17,27 @@ import Profile from "./pages/profile";
 import Collaboration from "./pages/collaboration";
 import ModelAnswer from "./pages/modelAnswer";
 import api from "./api/axiosInstance";
-import webStyles from "./components/styles";
 import History from "./pages/history";
 import AttemptReview from "./pages/attemptReview";
+
+type LoginResponse = {
+  data: {
+    accessToken: string;
+    refreshToken: string;
+    id: string;
+    username: string;
+    email: string;
+    isAdmin: boolean;
+  };
+};
+
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
 
 function ProtectedUserRoute({ children }: { children: React.ReactNode }) {
   const stored = localStorage.getItem("login");
@@ -84,13 +102,16 @@ function Appcontent() {
     }
   }, [location.pathname]);
 
-  const login = async (event: any) => {
+  const login = async (event: React.MouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     try {
-      const response = await api.post(`${import.meta.env.VITE_USER_SERVICE_URL}/auth/login`, {
-        email,
-        password,
-      });
+      const response = await api.post<LoginResponse>(
+        `${import.meta.env.VITE_USER_SERVICE_URL}/auth/login`,
+        {
+          email,
+          password,
+        },
+      );
 
       console.log("response", response);
       localStorage.setItem(
@@ -115,11 +136,12 @@ function Appcontent() {
           navigate("/homepage");
         }
       }, 1000);
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const apiError = error as ApiError;
       setEmail("");
       setPassword("");
-      if (error.response !== undefined) {
-        setError(error.response.data.message);
+      if (apiError.response !== undefined) {
+        setError(apiError.response.data?.message ?? "");
       }
       console.log(error);
     }

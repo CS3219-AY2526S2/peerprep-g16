@@ -34,6 +34,16 @@ const makeUser = (
   ...overrides,
 });
 
+type MatchedResult = {
+  matchedWith: { userId: string };
+  roomId: string;
+};
+
+type WaitingResult = {
+  elapsed: number;
+  preferences: { topic: string; difficulty: string };
+};
+
 describe('MatchService', () => {
   let service: MatchService;
   let redisService: ReturnType<typeof mockRedisService>;
@@ -58,8 +68,7 @@ describe('MatchService', () => {
 
   describe('joinQueue', () => {
     it('returns already_in_queue when user hash already exists', async () => {
-      client.hgetall
-        .mockResolvedValueOnce({ userId: 'user-a' });
+      client.hgetall.mockResolvedValueOnce({ userId: 'user-a' });
 
       const result = await service.joinQueue(
         'user-a',
@@ -93,9 +102,7 @@ describe('MatchService', () => {
     });
 
     it('stores user data and adds to sorted set on fresh join', async () => {
-      client.hgetall
-        .mockResolvedValueOnce({})
-        .mockResolvedValueOnce({});
+      client.hgetall.mockResolvedValueOnce({}).mockResolvedValueOnce({});
       client.hset.mockResolvedValue(1);
       client.zadd.mockResolvedValue(1);
 
@@ -133,9 +140,7 @@ describe('MatchService', () => {
     });
 
     it('defaults topic and difficulty to Random when not provided', async () => {
-      client.hgetall
-        .mockResolvedValueOnce({})
-        .mockResolvedValueOnce({});
+      client.hgetall.mockResolvedValueOnce({}).mockResolvedValueOnce({});
       client.hset.mockResolvedValue(1);
       client.zadd.mockResolvedValue(1);
 
@@ -156,13 +161,16 @@ describe('MatchService', () => {
   });
 
   describe('findMatch', () => {
-    const setupQueue = (currentUser: Record<string, string>, otherUsers: Record<string, string>[]) => {
+    const setupQueue = (
+      currentUser: Record<string, string>,
+      otherUsers: Record<string, string>[],
+    ) => {
       const ids = otherUsers.map((u) => u.userId);
       client.zrange.mockResolvedValue(['user-a', ...ids]);
-      client.hgetall.mockImplementation(async (key: string) => {
+      client.hgetall.mockImplementation((key: string) => {
         if (key === 'user:user-a') return currentUser;
         const found = otherUsers.find((u) => key === `user:${u.userId}`);
-        return found ?? {};
+        return Promise.resolve(found ?? {});
       });
       client.zrem.mockResolvedValue(1);
       client.del.mockResolvedValue(1);
@@ -209,7 +217,9 @@ describe('MatchService', () => {
       );
 
       expect(result.status).toBe('matched');
-      expect((result as any).matchedWith).toMatchObject({ userId: 'user-b' });
+      expect((result as unknown as MatchedResult).matchedWith).toMatchObject({
+        userId: 'user-b',
+      });
     });
 
     it('does not match when topic differs and no Random fallback', async () => {
@@ -439,14 +449,12 @@ describe('MatchService', () => {
       const result = await service.getQueueStatus('user-a');
 
       expect(result.status).toBe('matched');
-      expect((result as any).roomId).toBe('room-1');
+      expect((result as unknown as MatchedResult).roomId).toBe('room-1');
       expect(client.del).toHaveBeenCalledWith('match:user-a');
     });
 
     it('returns not_in_queue when neither match nor user hash exists', async () => {
-      client.hgetall
-        .mockResolvedValueOnce({})
-        .mockResolvedValueOnce({});
+      client.hgetall.mockResolvedValueOnce({}).mockResolvedValueOnce({});
 
       const result = await service.getQueueStatus('user-a');
 
@@ -473,10 +481,10 @@ describe('MatchService', () => {
       const oldTimestamp = (Date.now() - 65_000).toString();
       const userData = makeUser({ joinedAt: oldTimestamp });
 
-      client.hgetall.mockImplementation(async (key: string) => {
+      client.hgetall.mockImplementation((key: string) => {
         if (key === 'match:user-a') return {};
         if (key === 'user:user-a') return userData;
-        return {};
+        return Promise.resolve({});
       });
 
       client.zrange.mockResolvedValue(['user-a']);
@@ -495,10 +503,10 @@ describe('MatchService', () => {
       const recentTimestamp = (Date.now() - 10_000).toString();
       const userData = makeUser({ joinedAt: recentTimestamp });
 
-      client.hgetall.mockImplementation(async (key: string) => {
+      client.hgetall.mockImplementation((key: string) => {
         if (key === 'match:user-a') return {};
         if (key === 'user:user-a') return userData;
-        return {};
+        return Promise.resolve({});
       });
 
       client.zrange.mockResolvedValue(['user-a']);
@@ -506,8 +514,8 @@ describe('MatchService', () => {
       const result = await service.getQueueStatus('user-a');
 
       expect(result.status).toBe('waiting');
-      expect((result as any).elapsed).toBeGreaterThan(0);
-      expect((result as any).preferences).toMatchObject({
+      expect((result as unknown as WaitingResult).elapsed).toBeGreaterThan(0);
+      expect((result as unknown as WaitingResult).preferences).toMatchObject({
         topic: 'Arrays',
         difficulty: 'medium',
       });
@@ -554,8 +562,8 @@ describe('MatchService', () => {
 
       const result = await service.peekQueueStatus('user-a');
 
-      expect((result as any).elapsed).toBeGreaterThan(0);
-      expect((result as any).preferences).toMatchObject({
+      expect((result as unknown as WaitingResult).elapsed).toBeGreaterThan(0);
+      expect((result as unknown as WaitingResult).preferences).toMatchObject({
         topic: 'Trees',
         difficulty: 'hard',
       });
@@ -613,7 +621,7 @@ describe('MatchService', () => {
           topic: 'Graphs',
           userADifficulty: 'easy',
           userBDifficulty: 'medium',
-          timestamp: expect.any(String),
+          timestamp: expect.any(String) as unknown as string,
         }),
       );
     });

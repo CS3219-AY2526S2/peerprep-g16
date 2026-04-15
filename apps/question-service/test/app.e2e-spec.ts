@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/require-await, @typescript-eslint/only-throw-error */
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
@@ -110,15 +111,12 @@ function createQuestionModel(seed: StoredQuestion[] = []) {
       select: jest.fn().mockReturnThis(),
       lean: jest.fn().mockReturnThis(),
       exec: jest.fn(
-        async () =>
-          store.find((question) => matches(question, filter)) ?? null,
+        async () => store.find((question) => matches(question, filter)) ?? null,
       ),
     })),
     findOneAndDelete: jest.fn((filter = {}) => ({
       exec: jest.fn(async () => {
-        const index = store.findIndex((question) =>
-          matches(question, filter),
-        );
+        const index = store.findIndex((question) => matches(question, filter));
         if (index === -1) {
           return null;
         }
@@ -349,18 +347,21 @@ describe('question-service integration', () => {
   });
 
   it('keeps user feedback private while allowing admin filtering', async () => {
-    await bootstrap([], [
-      {
-        _id: 'feedback-admin-seed',
-        questionId: 'two-sum',
-        userId: 'someone-else',
-        category: 'wrong_difficulty',
-        comment: 'Too hard.',
-        status: 'reviewed',
-        adminNote: '',
-        createdAt: new Date(),
-      },
-    ]);
+    await bootstrap(
+      [],
+      [
+        {
+          _id: 'feedback-admin-seed',
+          questionId: 'two-sum',
+          userId: 'someone-else',
+          category: 'wrong_difficulty',
+          comment: 'Too hard.',
+          status: 'reviewed',
+          adminNote: '',
+          createdAt: new Date(),
+        },
+      ],
+    );
 
     await request(app.getHttpServer())
       .post('/feedback')

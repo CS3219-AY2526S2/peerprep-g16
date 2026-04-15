@@ -59,6 +59,11 @@ vi.mock('../components/topicSelectionOverlay', () => ({
   ),
 }));
 
+vi.mock('../api/collaborationService', () => ({
+  getActiveSession: vi.fn().mockResolvedValue(null),
+  rejoinSession: vi.fn().mockResolvedValue({}),
+}));
+
 import Homepage from './homepage';
 
 const asAxiosResponse = <T,>(data: T): AxiosResponse<T> =>

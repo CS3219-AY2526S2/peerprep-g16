@@ -14,7 +14,7 @@ export class MatchController {
   constructor(
     private readonly matchService: MatchService,
     private readonly redisService: RedisService,
-  ) { }
+  ) {}
 
   @Post()
   async joinQueue(@Body() body: JoinQueueDto) {
@@ -22,7 +22,12 @@ export class MatchController {
     if (!userId || !username || !topic) {
       return { message: 'userId, username and topic are required' };
     }
-    return await this.matchService.joinQueue(userId, username, topic, difficulty ?? 'Random');
+    return await this.matchService.joinQueue(
+      userId,
+      username,
+      topic,
+      difficulty ?? 'Random',
+    );
   }
 
   @Get('peek/:userId')

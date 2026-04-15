@@ -1,4 +1,7 @@
 import { Excalidraw, exportToBlob, reconcileElements } from "@excalidraw/excalidraw";
+import type { RemoteExcalidrawElement } from "@excalidraw/excalidraw/data/reconcile";
+import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
+import type { ExcalidrawElement } from "@excalidraw/excalidraw/element/types";
 import "@excalidraw/excalidraw/index.css";
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { Socket } from "socket.io-client";
@@ -12,8 +15,8 @@ const Whiteboard = forwardRef<WhiteboardHandle, {
     userId: string;
     socket: Socket | null;
 }>(function Whiteboard({ sessionId, userId, socket }, ref) {
-    const excalidrawAPI = useRef<any>(null);
-    const throttleTimer = useRef<any>(null);
+    const excalidrawAPI = useRef<ExcalidrawImperativeAPI | null>(null);
+    const throttleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useImperativeHandle(ref, () => ({
         async captureScreenshot(): Promise<string> {
@@ -39,7 +42,7 @@ const Whiteboard = forwardRef<WhiteboardHandle, {
     useEffect(() => {
         if (!socket) return;
 
-        socket.on("whiteboardUpdate", (payload: { elements: any[]; userId: string }) => {
+        socket.on("whiteboardUpdate", (payload: { elements: readonly ExcalidrawElement[]; userId: string }) => {
             if (payload.userId === userId) return;
 
             if (!excalidrawAPI.current) {
@@ -50,17 +53,19 @@ const Whiteboard = forwardRef<WhiteboardHandle, {
             const currentElements = excalidrawAPI.current.getSceneElements() || [];
             const reconciled = reconcileElements(
                 currentElements,
-                payload.elements,
+                payload.elements as readonly RemoteExcalidrawElement[],
                 excalidrawAPI.current.getAppState?.() || {}
             );
 
-            excalidrawAPI.current.updateScene({
+            const sceneUpdate = {
                 elements: reconciled,
                 commitToHistory: false,
-            });
+            } as Parameters<ExcalidrawImperativeAPI["updateScene"]>[0] & { commitToHistory: boolean };
+
+            excalidrawAPI.current.updateScene(sceneUpdate);
         });
 
-        socket.on("whiteboardState", (payload: { elements: any[] }) => {
+        socket.on("whiteboardState", (payload: { elements: readonly ExcalidrawElement[] }) => {
             excalidrawAPI.current?.updateScene({ elements: payload.elements });
         });
 

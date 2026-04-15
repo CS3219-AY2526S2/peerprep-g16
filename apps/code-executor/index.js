@@ -8,6 +8,13 @@ const crypto = require('crypto');
 const app = express();
 app.use(express.json({ limit: '1mb' }));
 
+app.get('/health', (_req, res) => {
+    res.status(200).json({
+        status: 'ok',
+        service: 'code-executor',
+    });
+});
+
 // Mirror Judge0 CE language IDs
 const LANGUAGES = {
     71: { name: 'python',     cmd: ['python3'],              ext: 'py'  },

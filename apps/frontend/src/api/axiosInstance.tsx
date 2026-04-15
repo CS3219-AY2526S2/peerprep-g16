@@ -1,6 +1,22 @@
-import axios from "axios";
+import axios, { type AxiosError, type InternalAxiosRequestConfig } from "axios";
 
 const api = axios.create();
+
+type RetryConfig = InternalAxiosRequestConfig & {
+  _retry?: boolean;
+};
+
+type LoginSession = {
+  refreshToken?: string;
+  token?: string;
+};
+
+type RefreshResponse = {
+  data: {
+    accessToken: string;
+    refreshToken: string;
+  };
+};
 
 api.interceptors.request.use((config) => {
   const stored = localStorage.getItem("login");
@@ -13,10 +29,10 @@ api.interceptors.request.use((config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const original = error.config;
+  async (error: AxiosError<{ code?: string }>) => {
+    const original = error.config as RetryConfig | undefined;
 
-    if (error.response?.status === 401 && !original._retry) {
+    if (error.response?.status === 401 && original && !original._retry) {
       if (error.response?.data?.code === "PRIVILEGE_CHANGED") {
         localStorage.removeItem("login");
         window.dispatchEvent(new CustomEvent("privilegeChanged"));
@@ -26,7 +42,7 @@ api.interceptors.response.use(
       original._retry = true;
 
       const stored = localStorage.getItem("login");
-      const { refreshToken } = stored ? JSON.parse(stored) : {};
+      const { refreshToken } = stored ? (JSON.parse(stored) as LoginSession) : {};
 
       if (!refreshToken) {
         localStorage.removeItem("login");
@@ -35,23 +51,26 @@ api.interceptors.response.use(
       }
 
       try {
-        const res = await axios.post(`${import.meta.env.VITE_USER_SERVICE_URL}/auth/refresh`, {
-          refreshToken,
-        });
+        const res = await axios.post<RefreshResponse>(
+          `${import.meta.env.VITE_USER_SERVICE_URL}/auth/refresh`,
+          {
+            refreshToken,
+          },
+        );
 
         const newAccessToken = res.data.data.accessToken;
         const newRefreshToken = res.data.data.refreshToken;
 
         localStorage.setItem("login", JSON.stringify({
-          ...JSON.parse(localStorage.getItem("login")!),
+          ...(JSON.parse(localStorage.getItem("login")!) as LoginSession),
           token: newAccessToken,
           refreshToken: newRefreshToken,
         }));
 
         original.headers.Authorization = `Bearer ${newAccessToken}`;
         return api(original);
-      } catch (err: any) {
-        if (err.response?.data?.code === "PRIVILEGE_CHANGED") {
+      } catch (err: unknown) {
+        if (axios.isAxiosError<{ code?: string }>(err) && err.response?.data?.code === "PRIVILEGE_CHANGED") {
           localStorage.removeItem("login");
           window.dispatchEvent(new CustomEvent("privilegeChanged"));
           return Promise.reject(err);

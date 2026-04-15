@@ -52,9 +52,13 @@ describe('SessionsService', () => {
   };
 
   beforeEach(async () => {
+    const nullQuery = Object.assign(Promise.resolve(null), {
+      lean: () => Promise.resolve(null),
+    });
+
     mockModel = {
       findOneAndUpdate: jest.fn().mockResolvedValue({}),
-      findOne: jest.fn().mockReturnValue({ lean: () => Promise.resolve(null) }),
+      findOne: jest.fn().mockReturnValue(nullQuery),
       find: jest.fn().mockResolvedValue([]),
     };
 

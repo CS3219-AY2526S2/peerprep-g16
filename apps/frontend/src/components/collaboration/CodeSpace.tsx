@@ -32,7 +32,7 @@ const STARTER_CODE = `# Write your solution here\n`;
 
 // ─── Input parser ─────────────────────────────────────────────────────────────
 
-interface ParsedVar { name: string; value: any; }
+interface ParsedVar { name: string; value: unknown; }
 
 /** Split by top-level commas, ignoring commas inside brackets/strings. */
 function splitTopLevel(s: string): string[] {
@@ -51,7 +51,7 @@ function splitTopLevel(s: string): string[] {
 }
 
 /** Parse a raw value string (array, number, bool, string) into a JS value. */
-function parseValue(raw: string): any {
+function parseValue(raw: string): unknown {
     const s = raw.trim();
     if (!s) return '';
     try {
@@ -83,7 +83,7 @@ function parseInputString(input: unknown): ParsedVar[] {
 }
 
 /** Convert a JS value to a valid Python literal. */
-function toPythonLiteral(v: any): string {
+function toPythonLiteral(v: unknown): string {
     if (v === null || v === undefined) return 'None';
     if (v === true) return 'True';
     if (v === false) return 'False';
@@ -95,6 +95,10 @@ function toPythonLiteral(v: any): string {
         return `{${pairs.join(', ')}}`;
     }
     return String(v);
+}
+
+function errorMessage(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
 }
 
 /**
@@ -295,8 +299,8 @@ export default function CodeSpace({
                             const actual = stdout.trimEnd();
                             const expected = tc.expectedOutput.trimEnd();
                             return { input: tc.input, expected, actual, passed: outputsMatch(actual, expected), error: stderr };
-                        } catch (err: any) {
-                            return { input: tc.input, expected: tc.expectedOutput, actual: "", passed: false, error: err.message };
+                        } catch (err: unknown) {
+                            return { input: tc.input, expected: tc.expectedOutput, actual: "", passed: false, error: errorMessage(err) };
                         }
                     }),
                 );
@@ -310,8 +314,8 @@ export default function CodeSpace({
 
             setRunOutput(output);
             socket.emit("code:result", { sessionId, output });
-        } catch (err: any) {
-            const output: RunOutput = { type: "raw", stdout: "", stderr: err.message };
+        } catch (err: unknown) {
+            const output: RunOutput = { type: "raw", stdout: "", stderr: errorMessage(err) };
             setRunOutput(output);
             socket.emit("code:result", { sessionId, output });
         } finally {

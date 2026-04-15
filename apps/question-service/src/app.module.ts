@@ -4,6 +4,7 @@ import { ConfigModule } from '@nestjs/config';
 import { QuestionModule } from './question/question.module';
 import { AuthModule } from './auth/auth.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { HealthController } from './health.controller';
 
 /**
  * Root application module.
@@ -20,5 +21,6 @@ import { FeedbackModule } from './feedback/feedback.module';
     QuestionModule,
     FeedbackModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}

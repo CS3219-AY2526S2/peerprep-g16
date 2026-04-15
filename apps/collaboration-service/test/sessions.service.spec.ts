@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { SessionsService } from '../src/sessions/sessions.service';
+import { getModelToken } from '@nestjs/mongoose';
+import { SessionsService, Question } from '../src/sessions/sessions.service';
+import { SessionState } from '../src/sessions/session-state.schema';
 
 // ─── Redis mock ───────────────────────────────────────────────────────────────
 
@@ -11,6 +13,7 @@ const redisMock = {
   get: jest.fn().mockResolvedValue(null),
   del: jest.fn().mockResolvedValue(1),
   keys: jest.fn().mockResolvedValue([]),
+  ping: jest.fn().mockResolvedValue('PONG'),
   xadd: jest.fn().mockResolvedValue('stream-id'),
   on: jest.fn(),
 };
@@ -42,13 +45,43 @@ function makeSessionData(
   };
 }
 
+const makeQuestion = (overrides: Partial<Question> = {}): Question => ({
+  questionId: 'two-sum',
+  title: 'Two Sum',
+  topic: ['Arrays'],
+  difficulty: 'Easy',
+  description: 'Find two numbers that add up to target.',
+  constraints: ['2 <= nums.length <= 10^4'],
+  examples: [],
+  hints: ['Use a hash map.'],
+  testCases: {
+    sample: [{ input: '[2,7,11,15]\n9', expectedOutput: '[0,1]' }],
+    hidden: [],
+  },
+  ...overrides,
+});
+
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
 describe('SessionsService', () => {
   let service: SessionsService;
+  let sessionStateModel: {
+    findOneAndUpdate: jest.Mock;
+    findOne: jest.Mock;
+    find: jest.Mock;
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    const nullQuery = Object.assign(Promise.resolve(null), {
+      lean: () => Promise.resolve(null),
+    });
+
+    sessionStateModel = {
+      findOneAndUpdate: jest.fn().mockResolvedValue({}),
+      findOne: jest.fn().mockReturnValue(nullQuery),
+      find: jest.fn().mockResolvedValue([]),
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -65,6 +98,10 @@ describe('SessionsService', () => {
               return config[key];
             }),
           },
+        },
+        {
+          provide: getModelToken(SessionState.name),
+          useValue: sessionStateModel,
         },
       ],
     }).compile();
@@ -121,12 +158,7 @@ describe('SessionsService', () => {
   // ─── attachQuestion ───────────────────────────────────────────────────────
 
   describe('attachQuestion', () => {
-    const mockQuestion = {
-      questionId: 'two-sum',
-      title: 'Two Sum',
-      topic: ['Arrays'],
-      difficulty: 'Easy',
-    };
+    const mockQuestion = makeQuestion();
 
     it('sets question and transitions status to active', async () => {
       await service.create(makeSessionData());
@@ -253,12 +285,7 @@ describe('SessionsService', () => {
 
     it('publishes session.completed event to Redis stream', async () => {
       await service.create(makeSessionData());
-      await service.attachQuestion('match-123', {
-        questionId: 'two-sum',
-        title: 'Two Sum',
-        topic: ['Arrays'],
-        difficulty: 'Easy',
-      });
+      await service.attachQuestion('match-123', makeQuestion());
       service.updateCode('match-123', 'print(1)', 'python');
 
       await service.endSession('match-123');
