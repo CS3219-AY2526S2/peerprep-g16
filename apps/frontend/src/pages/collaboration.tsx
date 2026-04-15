@@ -49,6 +49,11 @@ function Collaboration() {
     const peerUsername = matchingId ? localStorage.getItem(`peer:${matchingId}`) : null;
     const whiteboardRef = useRef<WhiteboardHandle>(null);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [endSessionBlocked, setEndSessionBlocked] = useState(false);
+    const [blockedCountdown, setBlockedCountdown] = useState(30);
+    const [endSessionForcedMsg, setEndSessionForcedMsg] = useState(false);
+    const blockedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const blockedAtRef = useRef<number>(0);
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -105,7 +110,42 @@ function Collaboration() {
                     }
                 });
 
+                connectedSocket.on("endSession:blocked", () => {
+                    console.log("[endSession:blocked] received — showing blocked overlay");
+                    if (!mounted) return;
+                    setEndSessionBlocked(true);
+                    setBlockedCountdown(30);
+                    setEndSessionForcedMsg(false);
+                    blockedAtRef.current = Date.now();
+                    if (blockedIntervalRef.current) clearInterval(blockedIntervalRef.current);
+                    blockedIntervalRef.current = setInterval(() => {
+                        const elapsed = Math.floor((Date.now() - blockedAtRef.current) / 1000);
+                        setBlockedCountdown(Math.max(0, 30 - elapsed));
+                    }, 1000);
+                });
+
+                connectedSocket.on("endSession:forced", () => {
+                    console.log("[endSession:forced] received — navigating after 3s");
+                    if (blockedIntervalRef.current) {
+                        clearInterval(blockedIntervalRef.current);
+                        blockedIntervalRef.current = null;
+                    }
+                    if (mounted) {
+                        setEndSessionBlocked(false);
+                        setEndSessionForcedMsg(true);
+                    }
+                    setTimeout(() => {
+                        sessionStorage.setItem("canViewModelAnswer", "true");
+                        window.location.href = "/modelSolution/" + session.question?.questionId;
+                    }, 3000);
+                });
+
                 connectedSocket.on("endSession:confirmed", () => {
+                    if (blockedIntervalRef.current) {
+                        clearInterval(blockedIntervalRef.current);
+                        blockedIntervalRef.current = null;
+                    }
+                    setEndSessionBlocked(false);
                     sessionStorage.setItem("canViewModelAnswer", "true");
                     window.location.href = "/modelSolution/" + session.question?.questionId;
                 });
@@ -140,6 +180,7 @@ function Collaboration() {
 
         return () => {
             mounted = false;
+            if (blockedIntervalRef.current) clearInterval(blockedIntervalRef.current);
             disconnectSocket();
         };
     }, [matchingId, userId]);
@@ -215,11 +256,11 @@ function Collaboration() {
 
                 <button
                     onClick={handleEndSession}
-                    disabled={endSessionState !== "idle"}
+                    disabled={endSessionState !== "idle" || endSessionBlocked}
                     style={{
                         ...styles.endButton,
-                        opacity: endSessionState !== "idle" ? 0.6 : 1,
-                        cursor: endSessionState !== "idle" ? "not-allowed" : "pointer",
+                        opacity: endSessionState !== "idle" || endSessionBlocked ? 0.6 : 1,
+                        cursor: endSessionState !== "idle" || endSessionBlocked ? "not-allowed" : "pointer",
                         background: endSessionState === "declined" ? "#dd842b" : "#e63946",
                     }}
                 >
@@ -242,6 +283,31 @@ function Collaboration() {
                     </span>
                     <button onClick={handleApproveEnd} style={styles.approveEndBtn}>Confirm</button>
                     <button onClick={handleDeclineEnd} style={styles.declineEndBtn}>Cancel</button>
+                </div>
+            )}
+
+            {endSessionBlocked && (
+                <div style={styles.blockedOverlay}>
+                    <div style={styles.blockedCard}>
+                        <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "10px", color: "#fff" }}>
+                            Saving session data...
+                        </div>
+                        <div style={{ fontSize: "13px", color: "#a9b1d6", marginBottom: "20px" }}>
+                            Unable to save session data. Retrying automatically...
+                        </div>
+                        <div style={{ fontSize: "36px", fontWeight: 700, color: "#f4a261", fontVariantNumeric: "tabular-nums" }}>
+                            {Math.floor(blockedCountdown / 60)}:{String(blockedCountdown % 60).padStart(2, "0")}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#868e96", marginTop: "8px" }}>
+                            (up to 30 seconds)
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {endSessionForcedMsg && (
+                <div style={styles.forcedMessageBanner}>
+                    Session ended. Your attempt history will be saved shortly.
                 </div>
             )}
 
@@ -433,5 +499,18 @@ const styles: Record<string, CSSProperties> = {
         fontSize: "13px",
         fontWeight: 600,
         width: "100%",
+    },
+    blockedOverlay: {
+        position: "fixed" as const, inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.8)", display: "flex",
+        alignItems: "center", justifyContent: "center",
+    },
+    blockedCard: {
+        background: "#1a1a2e", borderRadius: "12px", padding: "32px 48px",
+        textAlign: "center" as const, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+    },
+    forcedMessageBanner: {
+        padding: "12px 28px", background: "#2a9d8f", color: "#fff",
+        textAlign: "center" as const, fontSize: "14px", fontWeight: 600,
     },
 };

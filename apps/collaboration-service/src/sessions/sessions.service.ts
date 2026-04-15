@@ -41,6 +41,8 @@ export interface Session {
   testCasesPassed: number;
   status: 'waiting' | 'active' | 'ended';
   createdAt: Date;
+  pendingEnd?: boolean;
+  pendingEndSince?: number;
 }
 
 const REDIS_PREFIX = 'collab:session:';
@@ -49,6 +51,8 @@ const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 const STATE_SAVE_DEBOUNCE_MS = 30 * 1000; // 30 seconds
 const RECOVERY_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
+const PENDING_END_TIMEOUT_MS = 30 * 1000; // 30 seconds
+const PENDING_END_RETRY_MS = 5 * 1000; // 5 seconds
 
 const DIFFICULTY_RANK: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
 function resolveDifficulty(
@@ -79,6 +83,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
   >();
   private readonly initialUpsertSent = new Set<string>();
   private recoveryInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly pendingEndRetryTimers = new Map<
+    string,
+    ReturnType<typeof setInterval>
+  >();
 
   constructor(
     private readonly configService: ConfigService,
@@ -87,7 +95,10 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
   ) {
     const redisUrl =
       this.configService.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
-    this.redis = new Redis(redisUrl, { lazyConnect: true });
+    this.redis = new Redis(redisUrl, {
+      lazyConnect: true,
+      enableOfflineQueue: false,
+    });
     this.redis.on('error', (err) =>
       this.logger.error(`Redis error: ${err.message}`),
     );
@@ -98,6 +109,14 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
       await this.redis.connect();
       this.logger.log('Connected to Redis');
       await this.restoreFromRedis();
+      for (const [, session] of this.sessions) {
+        if (session.pendingEnd) {
+          this.logger.log(
+            `Resuming pending end retry for restored session ${session.sessionId}`,
+          );
+          this.startPendingEndRetry(session.sessionId);
+        }
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.warn(
@@ -115,6 +134,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.recoveryInterval) clearInterval(this.recoveryInterval);
+    for (const timer of this.pendingEndRetryTimers.values()) clearInterval(timer);
     for (const timer of this.questionTimeouts.values()) clearTimeout(timer);
     for (const timer of this.idleTimers.values()) clearTimeout(timer);
     for (const timer of this.stateSaveTimers.values()) clearTimeout(timer);
@@ -175,6 +195,23 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`Failed to restore sessions from Redis: ${message}`);
+    }
+  }
+
+  private async isRedisHealthy(): Promise<boolean> {
+    try {
+      await Promise.race([
+        this.redis.ping(),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Redis ping timeout')), 2000),
+        ),
+      ]);
+      console.log('[isRedisHealthy] Redis is healthy');
+      return true;
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.log(`[isRedisHealthy] Redis is DOWN: ${message}`);
+      return false;
     }
   }
 
@@ -277,9 +314,26 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     return this.sessions.get(sessionId);
   }
 
-  async endSession(sessionId: string): Promise<Session | undefined> {
+  async endSession(
+    sessionId: string,
+    opts?: { forceBypassRedis?: boolean; suppressConfirmedEmit?: boolean },
+  ): Promise<Session | { blocked: true; reason: 'redis_unavailable' } | undefined> {
     const session = this.sessions.get(sessionId);
     if (!session || session.status === 'ended') return undefined;
+
+    if (!opts?.forceBypassRedis) {
+      const redisHealthy = await this.isRedisHealthy();
+      console.log(
+        `[endSession] Redis health for session ${sessionId}: ${redisHealthy ? 'UP' : 'DOWN'}`,
+      );
+      if (!redisHealthy) {
+        if (!session.pendingEnd) {
+          session.pendingEnd = true;
+          session.pendingEndSince = Date.now();
+        }
+        return { blocked: true, reason: 'redis_unavailable' };
+      }
+    }
 
     session.status = 'ended';
 
@@ -354,7 +408,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     }
 
     // Emit session completion with model answer to both users
-    if (this.io) {
+    if (this.io && !opts?.suppressConfirmedEmit) {
       this.io.to(sessionId).emit('endSession:confirmed', {
         ...session,
         modelAnswerData,
@@ -665,6 +719,48 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Failed to publish session.completed: ${message}`);
       return false;
     }
+  }
+
+  startPendingEndRetry(sessionId: string): void {
+    if (this.pendingEndRetryTimers.has(sessionId)) return;
+
+    const timer = setInterval(() => {
+      void (async () => {
+        const session = this.sessions.get(sessionId);
+        if (!session) {
+          clearInterval(timer);
+          this.pendingEndRetryTimers.delete(sessionId);
+          return;
+        }
+
+        const redisHealthy = await this.isRedisHealthy();
+
+        if (redisHealthy) {
+          clearInterval(timer);
+          this.pendingEndRetryTimers.delete(sessionId);
+          await this.endSession(sessionId);
+          // endSession:confirmed is emitted inside endSession()
+          return;
+        }
+
+        const elapsed = Date.now() - (session.pendingEndSince ?? Date.now());
+        if (elapsed >= PENDING_END_TIMEOUT_MS) {
+          clearInterval(timer);
+          this.pendingEndRetryTimers.delete(sessionId);
+          await this.endSession(sessionId, {
+            forceBypassRedis: true,
+            suppressConfirmedEmit: true,
+          });
+          if (this.io) {
+            this.io.to(sessionId).emit('endSession:forced', {
+              message:
+                'Session ended. Your attempt history will be saved shortly.',
+            });
+          }
+        }
+      })();
+    }, PENDING_END_RETRY_MS);
+    this.pendingEndRetryTimers.set(sessionId, timer);
   }
 
   // ─── Disconnect / reconnect handling ─────────────────────────────────────

@@ -331,7 +331,22 @@ export class WhiteboardGateway
     @ConnectedSocket() client: Socket,
   ) {
     this.assertSocketInSession(client, data.sessionId);
-    await this.sessionsService.endSession(data.sessionId);
-    this.server.to(data.sessionId).emit('endSession:confirmed');
+    const result = await this.sessionsService.endSession(data.sessionId);
+    console.log(
+      `[endSession:approve] result for session ${data.sessionId}:`,
+      JSON.stringify(result),
+    );
+    if (result !== null && result !== undefined && 'blocked' in result) {
+      console.log(
+        `[endSession:approve] Redis down — emitting endSession:blocked to room ${data.sessionId}`,
+      );
+      this.server.to(data.sessionId).emit('endSession:blocked', {
+        reason: 'redis_unavailable',
+        message: 'Unable to save session data. Retrying automatically...',
+        retryDurationMs: 30000,
+      });
+      this.sessionsService.startPendingEndRetry(data.sessionId);
+    }
+    // endSession:confirmed is emitted by sessionsService.endSession() on success
   }
 }
