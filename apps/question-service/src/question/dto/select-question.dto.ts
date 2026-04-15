@@ -1,7 +1,9 @@
 import { Transform } from 'class-transformer';
-import { IsArray, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsDefined, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class SelectQuestionDto {
+  @IsDefined()
+  @IsNotEmpty()
   @IsString()
   topic: string;
 

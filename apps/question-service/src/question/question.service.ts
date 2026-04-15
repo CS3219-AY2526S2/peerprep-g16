@@ -236,7 +236,7 @@ export class QuestionService {
    * never be treated as a stored question topic.
    */
   private isRandomTopic(topic: string): boolean {
-    return topic.trim().toLowerCase() === 'random';
+    return !!topic && topic.trim().toLowerCase() === 'random';
   }
 
   private buildTopicFilter(topic: string): QuestionFilter {

@@ -12,9 +12,9 @@ import {
 import { AdminGuard } from '../auth/admin.guard';
 import { UserGuard } from '../auth/user.guard';
 import { QuestionService } from './question.service';
-import type { SelectQuestionDto } from './dto/select-question.dto';
-import type { CreateQuestionDto } from './dto/create-question.dto';
-import type { UpdateQuestionDto } from './dto/update-question.dto';
+import { SelectQuestionDto } from './dto/select-question.dto';
+import { CreateQuestionDto } from './dto/create-question.dto';
+import { UpdateQuestionDto } from './dto/update-question.dto';
 
 /**
  * Controller exposing HTTP endpoints for question management.
