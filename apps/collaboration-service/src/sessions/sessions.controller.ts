@@ -2,7 +2,6 @@ import {
   Controller,
   Post,
   Get,
-  Body,
   Param,
   NotFoundException,
   UseGuards,
@@ -20,21 +19,6 @@ type AuthenticatedRequest = Request & {
 @Controller('sessions')
 export class SessionsController {
   constructor(private readonly sessionsService: SessionsService) {}
-
-  @Post('create')
-  async create(
-    @Body()
-    body: {
-      userAId: string;
-      userBId: string;
-      matchId: string;
-      topic: string;
-      userADifficulty: string;
-      userBDifficulty: string;
-    },
-  ) {
-    return this.sessionsService.create(body);
-  }
 
   @UseGuards(UserGuard)
   @Get(':id')
