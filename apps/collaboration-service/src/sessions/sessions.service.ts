@@ -267,6 +267,35 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
     await this.publishSessionCompleted(session);
 
+    // Fetch model answer data from Question Service (non-blocking)
+    let modelAnswerData = null;
+    if (session.question?.questionId) {
+      try {
+        const questionServiceUrl =
+          this.configService.get<string>('QUESTION_SERVICE_URL') ??
+          'http://localhost:3002';
+        const res = await fetch(
+          `${questionServiceUrl}/questions/${session.question.questionId}/model-answer`,
+        );
+        this.logger.log(
+          `Model answer fetch status: ${res.status} for questionId: ${session.question.questionId}`,
+        );
+        if (res.ok) modelAnswerData = await res.json();
+        this.logger.log(`Model answer data: ${JSON.stringify(modelAnswerData)}`);
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to fetch model answer: ${message}`);
+      }
+    }
+
+    // Emit endSession:confirmed with session data and model answer
+    if (this.io) {
+      this.io.to(sessionId).emit('endSession:confirmed', {
+        ...session,
+        modelAnswerData,
+      });
+    }
+
     this.sessions.delete(sessionId);
     try {
       await this.redis.del(`${REDIS_PREFIX}${sessionId}`);

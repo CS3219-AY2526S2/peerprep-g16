@@ -3,11 +3,12 @@ import { Question, QuestionDocument } from './schemas/question.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SelectQuestionDto } from './dto/select-question.dto';
+import { ConflictException, BadRequestException } from '@nestjs/common';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 
 type QuestionFilter = {
-  topic: string;
+  topic?: string;
   difficulty?: string;
   questionId?: { $nin: string[] };
 };
@@ -26,7 +27,7 @@ export class QuestionService {
   constructor(
     @InjectModel(Question.name)
     private readonly questionModel: Model<QuestionDocument>,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all questions matching the optional topic and difficulty filters.
@@ -38,10 +39,31 @@ export class QuestionService {
   async findAll(topic?: string, difficulty?: string) {
     const filter: Record<string, string> = {};
 
-    if (topic) filter.topic = topic;
+    if (topic && !this.isRandomTopic(topic)) filter.topic = topic;
     if (difficulty) filter.difficulty = difficulty;
 
     return this.questionModel.find(filter).exec();
+  }
+
+  /**
+   * Retrieves a single question by its stable questionId.
+   *
+   * This is used by attempt review pages to reconstruct the original problem
+   * statement for a saved attempt. The questionId is the human-readable stable
+   * identifier, such as "binary-search", not the MongoDB document _id.
+   *
+   * @param questionId Stable question identifier stored on the attempt record
+   * @returns Promise resolving to the matching question document
+   * @throws NotFoundException if no question exists with the given questionId
+   */
+  async findByQuestionId(questionId: string) {
+    const question = await this.questionModel.findOne({ questionId }).exec();
+
+    if (!question) {
+      throw new NotFoundException(`Question ${questionId} not found`);
+    }
+
+    return question;
   }
 
   /**
@@ -50,9 +72,24 @@ export class QuestionService {
    * @param createQuestionDto Request payload containing question data
    * @returns Promise resolving to the newly created question
    */
-  async create(createQuestionDto: CreateQuestionDto) {
-    const createdQuestion = new this.questionModel(createQuestionDto);
-    return createdQuestion.save();
+  async create(createQuestionDto: any) {
+    try {
+      const createdQuestion = new this.questionModel(createQuestionDto);
+      return await createdQuestion.save();
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null) {
+        if ('code' in error && (error as any).code === 11000) {
+          throw new ConflictException(
+            `Question ${createQuestionDto.questionId} already exists`,
+          );
+        }
+        if ('name' in error && (error as any).name === 'ValidationError' && 'errors' in error) {
+          const fields = Object.values((error as any).errors).map((e: any) => e.path);
+          throw new BadRequestException(`Missing required fields: ${fields.join(', ')}`);
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -153,7 +190,7 @@ export class QuestionService {
     const uniqueExcludeIds = Array.from(new Set(attemptedQuestionIds));
 
     // Step 1: try to find unattempted questions first
-    const primaryFilter: QuestionFilter = { topic };
+    const primaryFilter = this.buildTopicFilter(topic);
     if (difficulty) primaryFilter.difficulty = difficulty;
     if (uniqueExcludeIds.length > 0) {
       primaryFilter.questionId = { $nin: uniqueExcludeIds };
@@ -166,7 +203,7 @@ export class QuestionService {
     }
 
     // Step 2: fallback — allow previously attempted questions
-    const fallbackFilter: QuestionFilter = { topic };
+    const fallbackFilter = this.buildTopicFilter(topic);
     if (difficulty) fallbackFilter.difficulty = difficulty;
 
     const fallbackQuestions = await this.questionModel
@@ -178,9 +215,7 @@ export class QuestionService {
     }
 
     // Step 3: fallback 2 — allow other difficulty levels
-    const fallbackFilter2: Pick<QuestionFilter, 'topic'> = {
-      topic,
-    };
+    const fallbackFilter2 = this.buildTopicFilter(topic);
 
     const fallbackQuestions2 = await this.questionModel
       .find(fallbackFilter2)
@@ -191,7 +226,21 @@ export class QuestionService {
     }
 
     // Step 4: true no-question case
-    throw new NotFoundException(`No question found for ${topic}`);
+    throw new NotFoundException(
+      `No question found for ${this.isRandomTopic(topic) ? 'any topic' : topic}`,
+    );
+  }
+
+  /**
+   * Matching Service uses "Random" as a placeholder for any topic. It should
+   * never be treated as a stored question topic.
+   */
+  private isRandomTopic(topic: string): boolean {
+    return !!topic && topic.trim().toLowerCase() === 'random';
+  }
+
+  private buildTopicFilter(topic: string): QuestionFilter {
+    return this.isRandomTopic(topic) ? {} : { topic };
   }
 
   /**
@@ -207,4 +256,28 @@ export class QuestionService {
     const randomIndex = Math.floor(Math.random() * questions.length);
     return questions[randomIndex];
   }
+
+  async findModelAnswer(questionId: string) {
+    const result = await this.questionModel
+      .findOne({ questionId })
+      .select('modelAnswer modelAnswerTimeComplexity modelAnswerExplanation -_id')
+      .lean()
+      .exec();
+
+    if (!result) throw new NotFoundException(`Question ${questionId} not found`);
+    return result;
+  }
+
+  async findQuestionDescription(questionId: string) {
+    const result = await this.questionModel
+      .findOne({ questionId })
+      .select('description -_id')
+      .lean()
+      .exec();
+
+    if (!result) throw new NotFoundException(`Question ${questionId} not found`);
+    return result;
+  }
 }
+
+

@@ -1,10 +1,29 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
 import webStyles from "./styles";
 
+interface TestCase {
+    input: string;
+    expectedOutput: string;
+}
+
+interface Question {
+    questionId: string;
+    title: string;
+    topic: string[];
+    difficulty: string;
+    description: string;
+    constraints: string[];
+    examples: { input: string; output: string; explanation?: string }[];
+    hints: string[];
+    testCases: { sample: TestCase[]; hidden: TestCase[] };
+    modelAnswer: string;
+    modelAnswerTimeComplexity: string;
+    modelAnswerExplanation: string;
+}
+
 interface QuestionTableProps {
-    questions: any[];
-    filteredQuestions: any[];
+    questions: Question[];
+    filteredQuestions: Question[];
     questionSearchQuery: string;
     setQuestionSearchQuery: (v: string) => void;
     filterTopic: string;
@@ -15,16 +34,19 @@ interface QuestionTableProps {
     sortOrder: string;
     handleSort: (field: string) => void;
     handleDeleteQuestion: (id: string) => void;
-    setEditQuestion: (q: any) => void;
+    setEditQuestion: (q: Question) => void;
     setShowEditQuestion: (v: boolean) => void;
     setQuestionError: (v: string) => void;
     setShowAddQuestion: (v: boolean) => void;
     questionSuccess: string;
     questionError: string;
+    setShowJSONUpload: (v: boolean) => void;
 }
 
-function QuestionTable({ questions, filteredQuestions, questionSearchQuery, setQuestionSearchQuery, filterTopic, setFilterTopic, filterDifficulty, setFilterDifficulty, sortField, sortOrder, handleSort, handleDeleteQuestion, setEditQuestion, setShowEditQuestion, setQuestionError, setShowAddQuestion, questionSuccess, questionError }: QuestionTableProps) {
-    const navigate = useNavigate();
+function QuestionTable({ questions, filteredQuestions, questionSearchQuery, setQuestionSearchQuery,
+    filterTopic, setFilterTopic, filterDifficulty, setFilterDifficulty, sortField, sortOrder, handleSort,
+    handleDeleteQuestion, setEditQuestion, setShowEditQuestion, setQuestionError, setShowAddQuestion,
+    questionSuccess, questionError, setShowJSONUpload }: QuestionTableProps) {
     return (
         <>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
@@ -68,6 +90,11 @@ function QuestionTable({ questions, filteredQuestions, questionSearchQuery, setQ
                     style={{ ...styles.addQuestionButton, marginLeft: "auto" }}>
                     + Add Question
                 </button>
+                <button
+                    onClick={() => { setShowJSONUpload(true); setQuestionError(""); }}
+                    style={{ ...styles.addQuestionButton, marginLeft: "10px" }}>
+                    Upload JSON
+                </button >
             </div>
 
             <table style={styles.table}>
