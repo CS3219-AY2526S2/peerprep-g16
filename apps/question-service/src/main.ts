@@ -16,7 +16,10 @@ async function bootstrap() {
     origin: '*',
     methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
-});
+  });
   await app.listen(process.env.PORT ?? 3002);
 }
-bootstrap();
+bootstrap().catch((error) => {
+  console.error('Failed to start question-service', error);
+  process.exit(1);
+});
