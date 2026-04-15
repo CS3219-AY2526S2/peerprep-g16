@@ -82,7 +82,7 @@ export class SessionsController {
 
   @UseGuards(UserGuard)
   @Post(':id/rejoin')
-  async rejoinSession(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
+  rejoinSession(@Param('id') id: string, @Req() req: AuthenticatedRequest) {
     const session = this.sessionsService.findOne(id);
     if (!session) throw new NotFoundException('Session not found');
 
