@@ -456,6 +456,7 @@ const styles: Record<string, CSSProperties> = {
     questionColumn: {
         padding: "20px 16px", background: "#fff", borderRight: "1px solid #e9ecef",
         overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px",
+        minHeight: 0,
     },
     problemHeader: { display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px" },
     problemTitle: {
