@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const Schema = mongoose.Schema;
 
@@ -6,7 +6,7 @@ const AttemptModelSchema = new Schema(
   {
     userId: {
       type: Schema.Types.ObjectId,
-      ref: "UserModel",
+      ref: 'UserModel',
       required: true,
     },
     questionId: {
@@ -22,14 +22,14 @@ const AttemptModelSchema = new Schema(
     },
     difficulty: {
       type: String,
-      enum: ["Easy", "Medium", "Hard"],
+      enum: ['Easy', 'Medium', 'Hard'],
     },
     collaborationSessionId: {
       type: String,
     },
     partnerId: {
       type: Schema.Types.ObjectId,
-      ref: "UserModel",
+      ref: 'UserModel',
     },
     language: {
       type: String,
@@ -53,8 +53,12 @@ const AttemptModelSchema = new Schema(
       type: Date,
       default: Date.now,
     },
+    code: {
+      type: String,
+      default: '',
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-export default mongoose.model("AttemptModel", AttemptModelSchema);
+export default mongoose.model('AttemptModel', AttemptModelSchema);

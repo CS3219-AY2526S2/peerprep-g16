@@ -12,9 +12,9 @@ import {
 import { AdminGuard } from '../auth/admin.guard';
 import { UserGuard } from '../auth/user.guard';
 import { QuestionService } from './question.service';
-import type { SelectQuestionDto } from './dto/select-question.dto';
-import type { CreateQuestionDto } from './dto/create-question.dto';
-import type { UpdateQuestionDto } from './dto/update-question.dto';
+import { SelectQuestionDto } from './dto/select-question.dto';
+import { CreateQuestionDto } from './dto/create-question.dto';
+import { UpdateQuestionDto } from './dto/update-question.dto';
 
 /**
  * Controller exposing HTTP endpoints for question management.
@@ -41,6 +41,39 @@ export class QuestionController {
     @Query('difficulty') difficulty?: string,
   ) {
     return this.questionService.findAll(topic, difficulty);
+  }
+
+  /**
+   * Retrieves the list of unique topics available in the question bank.
+   *
+   * Example:
+   * GET /questions/topics
+   *
+   * @returns Object containing sorted unique topic names
+   */
+  @UseGuards(UserGuard)
+  @Get('topics')
+  async findTopics() {
+    const topics = await this.questionService.findTopics();
+    return { topics };
+  }
+
+  /**
+   * Retrieves one question by its stable questionId.
+   *
+   * This endpoint is used by the frontend attempt review page to fetch the full
+   * problem statement, constraints, hints, and sample test cases for an attempt.
+   *
+   * Example:
+   * GET /questions/binary-search
+   *
+   * @param questionId Stable question identifier from the route parameter
+   * @returns The matching question document
+   */
+  @UseGuards(UserGuard)
+  @Get(':questionId')
+  async findByQuestionId(@Param('questionId') questionId: string) {
+    return this.questionService.findByQuestionId(questionId);
   }
 
   /**
@@ -86,21 +119,6 @@ export class QuestionController {
     @Body() body: UpdateQuestionDto,
   ) {
     return this.questionService.updateByQuestionId(questionId, body);
-  }
-
-  /**
-   * Retrieves the list of unique topics available in the question bank.
-   *
-   * Example:
-   * GET /questions/topics
-   *
-   * @returns Object containing sorted unique topic names
-   */
-  @UseGuards(UserGuard)
-  @Get('topics')
-  async findTopics() {
-    const topics = await this.questionService.findTopics();
-    return { topics };
   }
 
   /**

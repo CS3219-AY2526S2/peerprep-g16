@@ -105,13 +105,13 @@ export class Question {
     hidden: TestCase[];
   };
 
-  @Prop ({ required: true })
+  @Prop({ required: true })
   modelAnswer: string;
 
-  @Prop ({required: true})
+  @Prop({ required: true })
   modelAnswerTimeComplexity: string;
 
-  @Prop ({required: true})
+  @Prop({ required: true })
   modelAnswerExplanation: string;
 }
 
