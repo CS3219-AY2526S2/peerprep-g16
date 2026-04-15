@@ -44,6 +44,39 @@ export class QuestionController {
   }
 
   /**
+   * Retrieves the list of unique topics available in the question bank.
+   *
+   * Example:
+   * GET /questions/topics
+   *
+   * @returns Object containing sorted unique topic names
+   */
+  @UseGuards(UserGuard)
+  @Get('topics')
+  async findTopics() {
+    const topics = await this.questionService.findTopics();
+    return { topics };
+  }
+
+  /**
+   * Retrieves one question by its stable questionId.
+   *
+   * This endpoint is used by the frontend attempt review page to fetch the full
+   * problem statement, constraints, hints, and sample test cases for an attempt.
+   *
+   * Example:
+   * GET /questions/binary-search
+   *
+   * @param questionId Stable question identifier from the route parameter
+   * @returns The matching question document
+   */
+  @UseGuards(UserGuard)
+  @Get(':questionId')
+  async findByQuestionId(@Param('questionId') questionId: string) {
+    return this.questionService.findByQuestionId(questionId);
+  }
+
+  /**
    * Creates a new question in the question bank.
    *
    * @param body Request body containing the question data
@@ -86,21 +119,6 @@ export class QuestionController {
     @Body() body: UpdateQuestionDto,
   ) {
     return this.questionService.updateByQuestionId(questionId, body);
-  }
-
-  /**
-   * Retrieves the list of unique topics available in the question bank.
-   *
-   * Example:
-   * GET /questions/topics
-   *
-   * @returns Object containing sorted unique topic names
-   */
-  @UseGuards(UserGuard)
-  @Get('topics')
-  async findTopics() {
-    const topics = await this.questionService.findTopics();
-    return { topics };
   }
 
   /**
