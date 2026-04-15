@@ -49,6 +49,7 @@ function Collaboration() {
     const peerUsername = matchingId ? localStorage.getItem(`peer:${matchingId}`) : null;
     const whiteboardRef = useRef<WhiteboardHandle>(null);
     const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const isEndSessionButtonDisabled = endSessionState !== "idle" || incomingEndRequest;
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -145,7 +146,7 @@ function Collaboration() {
     }, [matchingId, userId]);
 
     const handleEndSession = () => {
-        if (!socket || endSessionState !== "idle") return;
+        if (!socket || isEndSessionButtonDisabled) return;
         setEndSessionState("pending");
         socket.emit("endSession:request", { sessionId: matchingId });
     };
@@ -215,11 +216,11 @@ function Collaboration() {
 
                 <button
                     onClick={handleEndSession}
-                    disabled={endSessionState !== "idle"}
+                    disabled={isEndSessionButtonDisabled}
                     style={{
                         ...styles.endButton,
-                        opacity: endSessionState !== "idle" ? 0.6 : 1,
-                        cursor: endSessionState !== "idle" ? "not-allowed" : "pointer",
+                        opacity: isEndSessionButtonDisabled ? 0.6 : 1,
+                        cursor: isEndSessionButtonDisabled ? "not-allowed" : "pointer",
                         background: endSessionState === "declined" ? "#dd842b" : "#e63946",
                     }}
                 >
