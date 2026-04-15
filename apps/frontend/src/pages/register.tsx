@@ -2,6 +2,17 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
 import styles from "../components/styles";
+const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
+
+// --- Types ---
+interface ApiError {
+    response?: {
+        status?: number;
+        data?: {
+            message?: string;
+        };
+    };
+}
 
 function Register() {
     const [username, setUsername] = useState("");
@@ -11,14 +22,14 @@ function Register() {
     const [error, setError] = useState("");
     const navigate = useNavigate();
     const [success, setSuccess] = useState("");
-    const handleRegister = async () => {
 
+    const handleRegister = async () => {
         if (!handleEmailValidation()) return
         else if (!handlePasswordValidation()) return
         else if (!handleConfirmPasswordValidation()) return
 
         try {
-            await api.post('http://localhost:3001/users', {
+            await api.post(`${USER_SERVICE_URL}/users`, {
                 username,
                 email,
                 password,
@@ -26,17 +37,16 @@ function Register() {
             setError("")
             setSuccess("Registration successful! Redirecting to login...")
             setTimeout(() => navigate('/'), 2000)
-        } catch (error: any) {
-            if (error.response?.status === 409) {
+        } catch (err) {
+            const apiErr = err as ApiError;
+            if (apiErr.response?.status === 409) {
                 setError("Username already exists, please choose a different one.")
-            }
-            else {
-                console.log(error)
-                setError(error.response?.data?.message || 'Registration failed.')
+            } else {
+                console.log(apiErr)
+                setError(apiErr.response?.data?.message || 'Registration failed.')
             }
         }
     }
-
 
     const handleEmailValidation = () => {
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -47,6 +57,7 @@ function Register() {
         setError("");
         return true;
     }
+
     const handlePasswordValidation = () => {
         const uppercaseRegex = /[A-Z]/;
         const lowercaseRegex = /[a-z]/;
@@ -57,26 +68,22 @@ function Register() {
             setPassword("");
             setConfirmPassword("");
             return false;
-        }
-        else if (!uppercaseRegex.test(password)) {
+        } else if (!uppercaseRegex.test(password)) {
             setError("Password must contain at least 1 Uppercase letter.");
             setPassword("");
             setConfirmPassword("");
             return false;
-        }
-        else if (!lowercaseRegex.test(password)) {
+        } else if (!lowercaseRegex.test(password)) {
             setError("Password must contain at least 1 lowercase letter.");
             setPassword("");
             setConfirmPassword("");
             return false;
-        }
-        else if (!numberRegex.test(password)) {
+        } else if (!numberRegex.test(password)) {
             setError("Password must contain at least 1 number.");
             setPassword("");
             setConfirmPassword("");
             return false;
-        }
-        else if (!specialCharRegex.test(password)) {
+        } else if (!specialCharRegex.test(password)) {
             setError("Password must contain at least 1 special character (@$!%*?&).");
             setPassword("");
             setConfirmPassword("");
@@ -95,7 +102,6 @@ function Register() {
         }
         return true
     }
-
 
     return (
         <div style={styles.container}>
@@ -122,7 +128,7 @@ function Register() {
             <label style={styles.label}>
                 Password:
                 <input
-                    type="text"
+                    type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     style={styles.input}
@@ -143,7 +149,7 @@ function Register() {
             <label style={styles.label}>
                 Confirm Password:
                 <input
-                    type="text"
+                    type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     style={styles.input}
@@ -151,9 +157,8 @@ function Register() {
             </label>
             <button onClick={handleRegister} style={styles.button}>Register</button>
             {success && <p style={{ color: "green" }}>{success}</p>}
-            {error && <p style={{ color: "red" }}>{error}</p>}
             <p>
-                Already have an account?{" "} <Link to="/" style={styles.link}>Login</Link>.
+                Already have an account?{" "}<Link to="/" style={styles.link}>Login</Link>.
             </p>
         </div>
     );

@@ -21,7 +21,7 @@ export interface Session {
 }
 
 const REDIS_PREFIX = 'collab:session:';
-const FLUSH_DELAY_MS = 5000;
+const FLUSH_DELAY_MS = 1000;
 const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 
@@ -227,6 +227,27 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
 
         await this.publishSessionCompleted(session);
 
+        let modelAnswerData = null;
+        if (session.question?.questionId) {
+            try {
+                const questionServiceUrl = this.configService.get<string>('QUESTION_SERVICE_URL') ?? 'http://localhost:3002';
+                const res = await fetch(`${questionServiceUrl}/questions/${session.question.questionId}/model-answer`);
+                this.logger.log(`Model answer fetch status: ${res.status} for questionId: ${session.question.questionId}`);
+                if (res.ok) modelAnswerData = await res.json();
+                this.logger.log(`Model answer data: ${JSON.stringify(modelAnswerData)}`);
+            } catch (err: any) {
+                this.logger.warn(`Failed to fetch model answer: ${err.message}`);
+            }
+        }
+
+        // After fetch res.ok && modelAnswerData = await res.json()
+        if (this.io) {
+            this.io.to(sessionId).emit('endSession:confirmed', {
+                ...session,
+                modelAnswerData  // or directly { modelAnswer: ..., etc. }
+            });
+        }
+
         this.sessions.delete(sessionId);
         try {
             await this.redis.del(`${REDIS_PREFIX}${sessionId}`);
@@ -415,7 +436,6 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             this.idleTimers.delete(sessionId);
             this.logger.log(`Idle timeout reached — auto-terminating session ${sessionId}`);
             await this.endSession(sessionId);
-            io.to(sessionId).emit('endSession:confirmed');
         }, IDLE_TIMEOUT_MS);
         this.idleTimers.set(sessionId, timer);
     }

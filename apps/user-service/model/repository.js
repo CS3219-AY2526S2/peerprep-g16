@@ -1,10 +1,10 @@
-import UserModel from "./user-model.js";
-import "dotenv/config";
-import { connect } from "mongoose";
+import UserModel from './user-model.js';
+import 'dotenv/config';
+import { connect } from 'mongoose';
 
 export async function connectToDB() {
   let mongoDBUri =
-    process.env.ENV === "PROD"
+    process.env.ENV === 'PROD'
       ? process.env.DB_CLOUD_URI
       : process.env.DB_LOCAL_URI;
 
@@ -24,7 +24,9 @@ export async function findUserById(userId) {
 }
 
 export async function findUserByUsername(username) {
-  return UserModel.findOne({ username: { $regex: new RegExp(`^${username}$`, 'i') } });
+  return UserModel.findOne({
+    username: { $regex: new RegExp(`^${username}$`, 'i') },
+  });
 }
 
 export async function findUserByUsernameOrEmail(username, email) {
@@ -50,7 +52,7 @@ export async function updateUserById(userId, username, email, password) {
         password,
       },
     },
-    { new: true },  // return the updated user
+    { new: true }, // return the updated user
   );
 }
 
@@ -62,7 +64,7 @@ export async function updateUserPrivilegeById(userId, isAdmin) {
         isAdmin,
       },
     },
-    { new: true },  // return the updated user
+    { new: true }, // return the updated user
   );
 }
 
@@ -74,7 +76,7 @@ export async function updateRefreshToken(userId, refreshToken) {
   return UserModel.findByIdAndUpdate(
     userId,
     { $set: { refreshToken } },
-    { new: true }
+    { new: true },
   );
 }
 
@@ -85,7 +87,7 @@ export async function incrementFailedLoginAttempts(userId) {
     {
       $inc: { failedLoginAttempts: 1 }, // $inc adds 1 to the current value
     },
-    { new: true } // return the updated user so we can check the new count
+    { new: true }, // return the updated user so we can check the new count
   );
 }
 
@@ -100,7 +102,7 @@ export async function lockUserAccount(userId) {
         failedLoginAttempts: 0, // reset the counter after locking
       },
     },
-    { new: true }
+    { new: true },
   );
 }
 
@@ -114,6 +116,6 @@ export async function resetFailedLoginAttempts(userId) {
         lockUntil: null,
       },
     },
-    { new: true }
+    { new: true },
   );
 }

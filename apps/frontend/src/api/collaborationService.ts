@@ -1,7 +1,7 @@
 import { io, Socket } from "socket.io-client";
 import api from "./axiosInstance";
 
-const COLLAB_URL = "http://localhost:3003";
+const COLLAB_URL = import.meta.env.VITE_COLLABORATION_SERVICE_URL as string;
 
 let socket: Socket | null = null;
 

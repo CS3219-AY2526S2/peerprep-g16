@@ -1,9 +1,15 @@
-import React from "react";
 import styles from "./styles";
 
+interface User {
+    id: string;
+    username: string;
+    email: string;
+    isAdmin: boolean;
+}
+
 interface UserTableProps {
-    users: any[];
-    filteredUsers: any[];
+    users: User[];
+    filteredUsers: User[];
     searchQuery: string;
     setSearchQuery: (v: string) => void;
     filterAdmin: string;
@@ -18,7 +24,7 @@ interface UserTableProps {
     userError: string;
 }
 
-function UserTable({ users, filteredUsers, searchQuery, setSearchQuery, filterAdmin, setFilterAdmin, sortField, sortOrder, handleSort, handlePromote, handleDemote, currentUserId, userSuccess, userError }: UserTableProps) {
+function UserTable({ filteredUsers, searchQuery, setSearchQuery, filterAdmin, setFilterAdmin, sortField, sortOrder, handleSort, handlePromote, handleDemote, currentUserId, userSuccess, userError }: UserTableProps) {
     return (
         <>
             <h3 style={{ marginBottom: "20px" }}>User Database</h3>
