@@ -118,7 +118,7 @@ docker compose up --build
 
 Docker will start all services in the correct order. Once everything is running, open your browser and go to:
 
-http://localhost:5173
+https://peerprep16.duckdns.org
 
 ---
 
