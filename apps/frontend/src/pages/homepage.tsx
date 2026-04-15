@@ -1,13 +1,27 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import styles from "../components/styles";
 import api from "../api/axiosInstance";
 import { useNavigate } from "react-router-dom";
 import MatchmakingOverlay from "../components/matchmakingOverlay";
 import TopicSelectionOverlay from "../components/topicSelectionOverlay";
-
+import { getActiveSession, rejoinSession } from "../api/collaborationService";
 const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
 const QUESTION_SERVICE_URL = import.meta.env.VITE_QUESTION_SERVICE_URL as string;
 const MATCHING_SERVICE_URL = import.meta.env.VITE_MATCHING_SERVICE_URL as string;
+
+interface MatchData {
+    roomId: string;
+    status: string;
+    message?: string;
+}
+
+interface MatchStatusResponse {
+    status: string;
+    message?: string;
+    preferences?: { topic?: string; difficulty?: string };
+    elapsed?: number;
+    roomId?: string;
+}
 
 function Homepage() {
     const navigate = useNavigate();
@@ -21,18 +35,98 @@ function Homepage() {
     const [topics, setTopics] = useState<string[]>([]);
     const [topicsLoading, setTopicsLoading] = useState(true);
 
+    const [activeSession, setActiveSession] = useState<{
+        sessionId: string;
+        remainingMs: number;
+    } | null>(null);
+    const [rejoinCountdown, setRejoinCountdown] = useState(0);
+    const rejoinTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    const pollRef = useRef<any>(null);
-    const timerRef = useRef<any>(null);
+    const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const hasStartedRef = useRef(false);
     const isMatchedRef = useRef(false);
 
     const stopAll = () => {
-        clearInterval(pollRef.current);
-        clearInterval(timerRef.current);
+        if (pollRef.current) clearInterval(pollRef.current);
+        if (timerRef.current) clearInterval(timerRef.current);
         pollRef.current = null;
         timerRef.current = null;
     };
+
+    useEffect(() => {
+        getActiveSession().then((session) => {
+            if (!session || session.remainingMs <= 0) return;
+            setActiveSession({ sessionId: session.sessionId, remainingMs: session.remainingMs });
+            setRejoinCountdown(Math.ceil(session.remainingMs / 1000));
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!activeSession) return;
+        rejoinTimerRef.current = setInterval(() => {
+            setRejoinCountdown((prev) => {
+                if (prev <= 1) {
+                    if (rejoinTimerRef.current) clearInterval(rejoinTimerRef.current);
+                    setActiveSession(null);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => {
+            if (rejoinTimerRef.current) clearInterval(rejoinTimerRef.current);
+        };
+    }, [activeSession]);
+
+    const handleRejoin = async () => {
+        if (!activeSession) return;
+        try {
+            await rejoinSession(activeSession.sessionId);
+        } catch {
+            // session may have ended; proceed anyway and let the collaboration page handle it
+        }
+        navigate(`/collaboration/${activeSession.sessionId}`);
+    };
+
+    const handleMatchFound = useCallback((data: MatchData) => {
+        if (isMatchedRef.current) return;
+        isMatchedRef.current = true;
+        stopAll();
+        setMatchStatus("Match found! Redirecting...");
+        setTimeout(() => {
+            setIsMatchmaking(false);
+            navigate(`/collaboration/${data.roomId}`);
+        }, 1500);
+    }, [navigate]);
+
+    const startPolling = useCallback((userId: string) => {
+        pollRef.current = setInterval(async () => {
+            if (isMatchedRef.current) {
+                if (pollRef.current) clearInterval(pollRef.current);
+                return;
+            }
+
+            try {
+                const statusResponse = await api.get<MatchStatusResponse>(
+                    `${MATCHING_SERVICE_URL}/api/match/${userId}`
+                );
+                if (statusResponse.data.status === "matched") {
+                    handleMatchFound(statusResponse.data as MatchData);
+                } else if (statusResponse.data.status === "expand_search_difficulty") {
+                    setMatchStatus(statusResponse.data.message ?? "Expanding search...");
+                } else if (statusResponse.data.status === "timeout") {
+                    stopAll();
+                    setMatchStatus("No match found. Please try again later.");
+                    setIsTimeout(true);
+                } else if (statusResponse.data.status === "waiting") {
+                    setMatchStatus(statusResponse.data.message ?? "Searching for a match...");
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }, 1000);
+    }, [handleMatchFound]);
 
     const handleMatchmake = async () => {
         if (!topic) { setError(true); return; }
@@ -40,7 +134,7 @@ function Homepage() {
         try {
             await api.get(`${USER_SERVICE_URL}/auth/verify-token`);
         } catch {
-            return; // interceptor handles PRIVILEGE_CHANGED
+            return;
         }
 
         const stored = localStorage.getItem("login");
@@ -60,11 +154,12 @@ function Homepage() {
         setIsTimeout(false);
     };
 
-    //get topics from the database for the dropdown menu
     useEffect(() => {
         const fetchTopics = async () => {
             try {
-                const response = await api.get(`${QUESTION_SERVICE_URL}/questions/topics`);
+                const response = await api.get<{ topics: string[] }>(
+                    `${QUESTION_SERVICE_URL}/questions/topics`
+                );
                 setTopics(response.data.topics);
             } catch (err) {
                 console.error("Failed to fetch topics", err);
@@ -76,7 +171,6 @@ function Homepage() {
         fetchTopics();
     }, []);
 
-    // Check on page load if user is already in queue
     useEffect(() => {
         const stored = localStorage.getItem("login");
         const user = stored ? JSON.parse(stored) : null;
@@ -84,39 +178,36 @@ function Homepage() {
 
         const checkExistingQueue = async () => {
             try {
-                const response = await api.get(`${MATCHING_SERVICE_URL}/api/match/${user.id}`);
+                const response = await api.get<MatchStatusResponse>(
+                    `${MATCHING_SERVICE_URL}/api/match/peek/${user.id}`
+                );
 
-                if (response.data.status === 'matched') {
-                    // Already matched before they refreshed
-                    handleMatchFound(response.data);
-                } else if (response.data.status === 'waiting' ||
-                    response.data.status === 'expand_search_difficulty') {
-                    // Still in queue — restore the overlay
+                if (
+                    response.data.status === "waiting" ||
+                    response.data.status === "expand_search_difficulty"
+                ) {
                     const userData = response.data.preferences;
                     if (userData?.topic) setTopic(userData.topic);
                     if (userData?.difficulty) setDifficulty(userData.difficulty);
                     setIsMatchmaking(true);
-                    setMatchStatus(response.data.message || "Searching for a match...");
-                    hasStartedRef.current = true; // prevent useEffect re-joining
+                    setMatchStatus(response.data.message ?? "Searching for a match...");
+                    hasStartedRef.current = true;
                     startPolling(user.id);
-                    // Restore elapsed time if available
-                    if (response.data.elapsed) {
-                        setElapsed(Math.floor(response.data.elapsed / 1000));
-                        timerRef.current = setInterval(() => {
-                            setElapsed(prev => prev + 1);
-                        }, 1000);
-                    }
+                    setElapsed(
+                        response.data.elapsed ? Math.floor(response.data.elapsed / 1000) : 0
+                    );
+                    timerRef.current = setInterval(() => {
+                        setElapsed(prev => prev + 1);
+                    }, 1000);
                 }
-                // status === 'not_in_queue' → do nothing, normal page load
             } catch (err) {
-                console.error('Failed to check queue status on mount', err);
+                console.error("Failed to check queue status on mount", err);
             }
         };
 
         checkExistingQueue();
-    }, []);
+    }, [startPolling]);
 
-    //matchmaking 
     useEffect(() => {
         if (!isMatchmaking || isTimeout || hasStartedRef.current) return;
         hasStartedRef.current = true;
@@ -131,29 +222,35 @@ function Homepage() {
 
         const start = async () => {
             try {
-                const response = await api.post(`${MATCHING_SERVICE_URL}/api/match`, {
-                    userId: user.id,
-                    username: user.username,
-                    topic,
-                    difficulty: difficulty.toLowerCase(),
-                });
+                const response = await api.post<MatchStatusResponse>(
+                    `${MATCHING_SERVICE_URL}/api/match`,
+                    {
+                        userId: user.id,
+                        username: user.username,
+                        topic,
+                        difficulty: difficulty.toLowerCase(),
+                    }
+                );
 
-                if (response.data.status === 'already_in_queue' ||
-                    response.data.status === 'waiting') {
+                if (
+                    response.data.status === "already_in_queue" ||
+                    response.data.status === "waiting"
+                ) {
                     startPolling(user.id);
                     return;
                 }
 
-                if (response.data.status === 'already_matched') {
-                    const statusResponse = await api.get(`${MATCHING_SERVICE_URL}/api/match/${user.id}`);
-                    if (statusResponse.data.status === 'matched') {
-                        handleMatchFound(statusResponse.data);
+                if (response.data.status === "already_matched") {
+                    const statusResponse = await api.get<MatchStatusResponse>(
+                        `${MATCHING_SERVICE_URL}/api/match/${user.id}`
+                    );
+                    if (statusResponse.data.status === "matched") {
+                        handleMatchFound(statusResponse.data as MatchData);
                         return;
                     }
                     startPolling(user.id);
                     return;
                 }
-
             } catch (err) {
                 console.error(err);
                 stopAll();
@@ -164,23 +261,25 @@ function Homepage() {
         start();
 
         return () => stopAll();
-    }, [isMatchmaking]);
-
-    const handleMatchFound = (data: any) => {
-        if (isMatchedRef.current) return; // prevent double-firing
-        isMatchedRef.current = true;
-        stopAll();
-        setMatchStatus("Match found! Redirecting...");
-        if (data.matchedWith?.username) {
-            localStorage.setItem(`peer:${data.roomId}`, data.matchedWith.username);
-        }
-        setTimeout(() => {
-            setIsMatchmaking(false);
-            navigate(`/collaboration/${data.roomId}`);
-        }, 1500);
-    };
+    }, [isMatchmaking, isTimeout, topic, difficulty, startPolling, handleMatchFound]);
 
     const cancelMatchmaking = async () => {
+        const stored = localStorage.getItem("login");
+        const user = stored ? JSON.parse(stored) : null;
+        if (!user) return;
+
+        try {
+            const statusResponse = await api.get<MatchStatusResponse>(
+                `${MATCHING_SERVICE_URL}/api/match/${user.id}`
+            );
+            if (statusResponse.data.status === "matched") {
+                handleMatchFound(statusResponse.data as MatchData);
+                return;
+            }
+        } catch (err) {
+            console.error(err);
+        }
+
         stopAll();
         hasStartedRef.current = false;
         isMatchedRef.current = false;
@@ -188,45 +287,37 @@ function Homepage() {
         setElapsed(0);
         setIsTimeout(false);
 
-        const stored = localStorage.getItem("login");
-        const user = stored ? JSON.parse(stored) : null;
-        if (user) {
-            try {
-                await api.delete(`${MATCHING_SERVICE_URL}/api/match/${user.id}`);
-            } catch (err) {
-                console.error(err);
-            }
+        try {
+            await api.delete(`${MATCHING_SERVICE_URL}/api/match/${user.id}`);
+        } catch (err) {
+            console.error(err);
         }
-    };
-
-    const startPolling = (userId: string) => {
-        pollRef.current = setInterval(async () => {
-            if (isMatchedRef.current) {
-                clearInterval(pollRef.current);
-                return;
-            }
-            try {
-                const statusResponse = await api.get(`${MATCHING_SERVICE_URL}/api/match/${userId}`);
-
-                if (statusResponse.data.status === "matched") {
-                    handleMatchFound(statusResponse.data);
-                } else if (statusResponse.data.status === "expand_search_difficulty") {
-                    setMatchStatus(statusResponse.data.message);
-                } else if (statusResponse.data.status === "timeout") {
-                    stopAll();
-                    setMatchStatus("No match found. Please try again later.");
-                    setIsTimeout(true);
-                } else if (statusResponse.data.status === "waiting") {
-                    setMatchStatus(statusResponse.data.message);
-                }
-            } catch (err) {
-                console.error(err);
-            }
-        }, 1000);
     };
 
     return (
         <>
+            {activeSession && (
+                <div style={rejoinBannerStyle}>
+                    <span>
+                        You have an active session. Rejoin within{" "}
+                        <strong>{rejoinCountdown}s</strong>.
+                    </span>
+                    <div style={{ display: "flex", gap: "10px" }}>
+                        <button onClick={handleRejoin} style={rejoinButtonStyle}>
+                            Rejoin Session
+                        </button>
+                        <button
+                            onClick={() => {
+                                if (rejoinTimerRef.current) clearInterval(rejoinTimerRef.current);
+                                setActiveSession(null);
+                            }}
+                            style={dismissButtonStyle}
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            )}
             <div style={{ display: "flex", marginTop: "60px" }}>
                 <h3 style={styles.heading}>Main Page</h3>
             </div>
@@ -242,14 +333,10 @@ function Homepage() {
                             style={styles.select}
                             disabled={topicsLoading}
                         >
-                            {topicsLoading && (
-                                <option>Loading topics...</option>
-                            )}
-
+                            {topicsLoading && <option>Loading topics...</option>}
                             {!topicsLoading && topics.length === 0 && (
                                 <option disabled>Failed to load topics</option>
                             )}
-
                             {!topicsLoading && topics.length > 0 && (
                                 <>
                                     <option value="">Select...</option>
@@ -260,7 +347,12 @@ function Homepage() {
                                 </>
                             )}
                         </select>
-                        <p style={styles.important}>Note: <span style={styles.normalText}>Topic is required and if difficulty is not selected, it will be set as random.</span> </p>
+                        <p style={styles.important}>
+                            Note:{" "}
+                            <span style={styles.normalText}>
+                                Topic is required and if difficulty is not selected, it will be set as random.
+                            </span>
+                        </p>
                     </div>
 
                     <div style={styles.filterGroup}>
@@ -274,7 +366,8 @@ function Homepage() {
                             <option value="Easy">Easy</option>
                             <option value="Medium">Medium</option>
                             <option value="Hard">Hard</option>
-                        </select>                    </div>
+                        </select>
+                    </div>
                 </div>
 
                 <button onClick={handleMatchmake} style={styles.matchmakeButton}>
@@ -294,6 +387,7 @@ function Homepage() {
                             setIsTimeout(false);
                             setElapsed(0);
                         }}
+                        isRedirecting={matchStatus === "Match found! Redirecting..."}
                     />
                 )}
 
@@ -308,4 +402,39 @@ function Homepage() {
     );
 }
 
-export default Homepage
+const rejoinBannerStyle: React.CSSProperties = {
+    marginTop: "60px",
+    width: "100%",
+    boxSizing: "border-box",
+    backgroundColor: "#fff8e1",
+    border: "1px solid #f9a825",
+    borderRadius: "0 0 8px 8px",
+    padding: "12px 24px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+};
+
+const rejoinButtonStyle: React.CSSProperties = {
+    padding: "8px 18px",
+    backgroundColor: "#f9a825",
+    border: "none",
+    borderRadius: "20px",
+    fontWeight: "bold",
+    fontSize: "14px",
+    cursor: "pointer",
+    color: "#fff",
+};
+
+const dismissButtonStyle: React.CSSProperties = {
+    padding: "8px 18px",
+    backgroundColor: "white",
+    border: "2px solid #ccc",
+    borderRadius: "20px",
+    fontWeight: "bold",
+    fontSize: "14px",
+    cursor: "pointer",
+};
+
+export default Homepage;

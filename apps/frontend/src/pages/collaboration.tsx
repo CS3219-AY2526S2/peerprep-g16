@@ -10,11 +10,13 @@ import {
     fetchSession,
 } from "../api/collaborationService";
 import { Socket } from "socket.io-client";
+import FeedbackFormModal from "../components/feedbackFormModal";
 
 type ActivePanel = "whiteboard" | "code";
 
 type Question = {
     questionId: string;
+    _id?: string;
     title: string;
     topic: string[];
     difficulty: "Easy" | "Medium" | "Hard";
@@ -44,8 +46,43 @@ function Collaboration() {
     const [endSessionState, setEndSessionState] = useState<"idle" | "pending" | "declined">("idle");
     const [incomingEndRequest, setIncomingEndRequest] = useState(false);
     const [partnerOnline, setPartnerOnline] = useState<boolean | null>(null);
+    const [disconnectCountdown, setDisconnectCountdown] = useState<number | null>(null);
+    const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const peerUsername = matchingId ? localStorage.getItem(`peer:${matchingId}`) : null;
     const whiteboardRef = useRef<WhiteboardHandle>(null);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [endSessionBlocked, setEndSessionBlocked] = useState(false);
+    const [blockedCountdown, setBlockedCountdown] = useState(30);
+    const [endSessionForcedMsg, setEndSessionForcedMsg] = useState(false);
+    const blockedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const blockedAtRef = useRef<number>(0);
+    const isEndSessionButtonDisabled = endSessionState !== "idle" || incomingEndRequest || endSessionBlocked;
+
+    // Start a 120s countdown when partner disconnects, clear it when they rejoin
+    useEffect(() => {
+        if (partnerOnline === false) {
+            setDisconnectCountdown(120);
+            countdownRef.current = setInterval(() => {
+                setDisconnectCountdown(prev => {
+                    if (prev === null || prev <= 1) {
+                        clearInterval(countdownRef.current!);
+                        countdownRef.current = null;
+                        return null;
+                    }
+                    return prev - 1;
+                });
+            }, 1000);
+        } else {
+            if (countdownRef.current) {
+                clearInterval(countdownRef.current);
+                countdownRef.current = null;
+            }
+            setDisconnectCountdown(null);
+        }
+        return () => {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+        };
+    }, [partnerOnline]);
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -102,8 +139,44 @@ function Collaboration() {
                     }
                 });
 
+                connectedSocket.on("endSession:blocked", () => {
+                    console.log("[endSession:blocked] received — showing blocked overlay");
+                    if (!mounted) return;
+                    setEndSessionBlocked(true);
+                    setBlockedCountdown(30);
+                    setEndSessionForcedMsg(false);
+                    blockedAtRef.current = Date.now();
+                    if (blockedIntervalRef.current) clearInterval(blockedIntervalRef.current);
+                    blockedIntervalRef.current = setInterval(() => {
+                        const elapsed = Math.floor((Date.now() - blockedAtRef.current) / 1000);
+                        setBlockedCountdown(Math.max(0, 30 - elapsed));
+                    }, 1000);
+                });
+
+                connectedSocket.on("endSession:forced", () => {
+                    console.log("[endSession:forced] received — navigating after 3s");
+                    if (blockedIntervalRef.current) {
+                        clearInterval(blockedIntervalRef.current);
+                        blockedIntervalRef.current = null;
+                    }
+                    if (mounted) {
+                        setEndSessionBlocked(false);
+                        setEndSessionForcedMsg(true);
+                    }
+                    setTimeout(() => {
+                        sessionStorage.setItem("canViewModelAnswer", "true");
+                        window.location.href = "/modelSolution/" + session.question?.questionId;
+                    }, 3000);
+                });
+
                 connectedSocket.on("endSession:confirmed", () => {
-                    window.location.href = "/homepage";
+                    if (blockedIntervalRef.current) {
+                        clearInterval(blockedIntervalRef.current);
+                        blockedIntervalRef.current = null;
+                    }
+                    setEndSessionBlocked(false);
+                    sessionStorage.setItem("canViewModelAnswer", "true");
+                    window.location.href = "/modelSolution/" + session.question?.questionId;
                 });
 
                 if (session.status === "waiting") {
@@ -136,12 +209,13 @@ function Collaboration() {
 
         return () => {
             mounted = false;
+            if (blockedIntervalRef.current) clearInterval(blockedIntervalRef.current);
             disconnectSocket();
         };
     }, [matchingId, userId]);
 
     const handleEndSession = () => {
-        if (!socket || endSessionState !== "idle") return;
+        if (!socket || isEndSessionButtonDisabled) return;
         setEndSessionState("pending");
         socket.emit("endSession:request", { sessionId: matchingId });
     };
@@ -211,11 +285,11 @@ function Collaboration() {
 
                 <button
                     onClick={handleEndSession}
-                    disabled={endSessionState !== "idle"}
+                    disabled={isEndSessionButtonDisabled}
                     style={{
                         ...styles.endButton,
-                        opacity: endSessionState !== "idle" ? 0.6 : 1,
-                        cursor: endSessionState !== "idle" ? "not-allowed" : "pointer",
+                        opacity: isEndSessionButtonDisabled ? 0.6 : 1,
+                        cursor: isEndSessionButtonDisabled ? "not-allowed" : "pointer",
                         background: endSessionState === "declined" ? "#dd842b" : "#e63946",
                     }}
                 >
@@ -226,7 +300,10 @@ function Collaboration() {
             {partnerOnline === false && (
                 <div style={styles.partnerDisconnectedBanner}>
                     <span style={{ fontSize: "14px" }}>
-                        ⚠️ Your partner has disconnected. Session will auto-close if they don't rejoin within 2 minutes.
+                        ⚠️ Your partner has disconnected.
+                        {disconnectCountdown !== null && (
+                            <> Session will auto-close in <strong>{Math.floor(disconnectCountdown / 60)}:{String(disconnectCountdown % 60).padStart(2, "0")}</strong>.</>
+                        )}
                     </span>
                 </div>
             )}
@@ -241,9 +318,34 @@ function Collaboration() {
                 </div>
             )}
 
+            {endSessionBlocked && (
+                <div style={styles.blockedOverlay}>
+                    <div style={styles.blockedCard}>
+                        <div style={{ fontSize: "18px", fontWeight: 700, marginBottom: "10px", color: "#fff" }}>
+                            Saving session data...
+                        </div>
+                        <div style={{ fontSize: "13px", color: "#a9b1d6", marginBottom: "20px" }}>
+                            Unable to save session data. Retrying automatically...
+                        </div>
+                        <div style={{ fontSize: "36px", fontWeight: 700, color: "#f4a261", fontVariantNumeric: "tabular-nums" }}>
+                            {Math.floor(blockedCountdown / 60)}:{String(blockedCountdown % 60).padStart(2, "0")}
+                        </div>
+                        <div style={{ fontSize: "12px", color: "#868e96", marginTop: "8px" }}>
+                            (up to 30 seconds)
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {endSessionForcedMsg && (
+                <div style={styles.forcedMessageBanner}>
+                    Session ended. Your attempt history will be saved shortly.
+                </div>
+            )}
+
             <div style={styles.layoutGrid}>
                 <div style={styles.questionColumn}>
-                    <div>
+                    <div style={{ flexShrink: 0 }}>
                         <div style={styles.problemHeader}>
                             <div style={{ flex: 1 }}>
                                 <h2 style={styles.problemTitle}>
@@ -289,12 +391,24 @@ function Collaboration() {
                         </div>
                     </div>
 
-                    <HintPanel
-                        hints={question?.hints ?? []}
-                        socket={socket}
-                        sessionId={matchingId}
-                        userId={userId}
-                    />
+                    <div style={{ marginBottom: "12px", flexShrink: 0 }}>
+                        <button
+                            onClick={() => setShowFeedbackModal(true)}
+                            style={styles.feedbackButton}
+                            disabled={!question}
+                        >
+                            Give Feedback
+                        </button>
+                    </div>
+
+                    <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto" }}>
+                        <HintPanel
+                            hints={question?.hints ?? []}
+                            socket={socket}
+                            sessionId={matchingId}
+                            userId={userId}
+                        />
+                    </div>
                 </div>
 
                 <div style={styles.rightColumn}>
@@ -319,6 +433,11 @@ function Collaboration() {
                     </div>
                 </div>
             </div>
+            <FeedbackFormModal
+            show={showFeedbackModal}
+            questionId={question?.questionId || ""}
+            onClose={() => setShowFeedbackModal(false)}
+            />
         </div>
     );
 }
@@ -371,6 +490,7 @@ const styles: Record<string, CSSProperties> = {
     questionColumn: {
         padding: "20px 16px", background: "#fff", borderRight: "1px solid #e9ecef",
         overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px",
+        minHeight: 0, height: "100%",
     },
     problemHeader: { display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px" },
     problemTitle: {
@@ -403,5 +523,29 @@ const styles: Record<string, CSSProperties> = {
     declineEndBtn: {
         padding: "5px 14px", background: "transparent", color: "#495057",
         border: "1px solid #adb5bd", borderRadius: "6px", cursor: "pointer", fontSize: "12px",
+    },
+    feedbackButton: {
+        padding: "10px 14px",
+        background: "#6a4c93",
+        color: "#fff",
+        border: "none",
+        borderRadius: "8px",
+        cursor: "pointer",
+        fontSize: "13px",
+        fontWeight: 600,
+        width: "100%",
+    },
+    blockedOverlay: {
+        position: "fixed" as const, inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.8)", display: "flex",
+        alignItems: "center", justifyContent: "center",
+    },
+    blockedCard: {
+        background: "#1a1a2e", borderRadius: "12px", padding: "32px 48px",
+        textAlign: "center" as const, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+    },
+    forcedMessageBanner: {
+        padding: "12px 28px", background: "#2a9d8f", color: "#fff",
+        textAlign: "center" as const, fontSize: "14px", fontWeight: 600,
     },
 };

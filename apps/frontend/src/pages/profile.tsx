@@ -1,8 +1,19 @@
 import React from "react"
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/axiosInstance"
 import styles from "../components/styles";
+const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
+
+// --- Types ---
+interface ApiError {
+    response?: {
+        status?: number;
+        data?: {
+            message?: string;
+        };
+    };
+}
 
 const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
 
@@ -12,7 +23,6 @@ function Profile() {
     const token = user?.token;
     const [activeTab, setActiveTab] = React.useState("username");
     const [newUsername, setNewUsername] = useState("");
-    const [currentUsername, setCurrentUsername] = useState("");
     const [newEmail, setEmail] = useState("");
     const [newPassword, setNewPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
@@ -21,10 +31,14 @@ function Profile() {
     const [error, setError] = useState("");
     const navigate = useNavigate();
 
-    useEffect(() => {
+    // Use a ref to track the previous tab so we can reset on change
+    // without calling setState synchronously inside an effect body
+    
+    const switchTab = (tab: string) => {
+        setActiveTab(tab);
         setSuccess("");
         setError("");
-    }, [activeTab])
+    };
 
     const handleEmailUpdate = async () => {
         if (!emailChange()) return
@@ -41,9 +55,10 @@ function Profile() {
             }));
             setError("")
             setSuccess("Email Update successful!")
-        } catch (error: any) {
-            console.log(error)
-            setError(error.response?.data?.message || 'Email Update failed.')
+        } catch (err) {
+            const apiErr = err as ApiError;
+            console.log(apiErr)
+            setError(apiErr.response?.data?.message || 'Email Update failed.')
         }
     }
 
@@ -56,6 +71,7 @@ function Profile() {
         setError("");
         return true;
     }
+
     const emailChange = () => {
         if (newEmail === user?.email) {
             setError("Please enter a new email address.");
@@ -80,9 +96,10 @@ function Profile() {
             }));
             setError("")
             setSuccess("Password Update successful!")
-        } catch (error: any) {
-            console.log(error)
-            setError(error.response?.data?.message || 'Email Update failed.')
+        } catch (err) {
+            const apiErr = err as ApiError;
+            console.log(apiErr)
+            setError(apiErr.response?.data?.message || 'Password Update failed.')
         }
     }
 
@@ -134,6 +151,7 @@ function Profile() {
         }
         return true
     }
+
     const handleUsernameUpdate = async () => {
         if (!usernameChange()) return
 
@@ -148,12 +166,13 @@ function Profile() {
             }));
             setError("")
             setSuccess("Username Update successful!")
-        } catch (error: any) {
-            console.log(error)
-            if (error.response?.status === 409) {
+        } catch (err) {
+            const apiErr = err as ApiError;
+            console.log(apiErr)
+            if (apiErr.response?.status === 409) {
                 setError("Username already exists, please choose a different one.")
             } else {
-                setError(error.response?.data?.message || 'Username Update failed.')
+                setError(apiErr.response?.data?.message || 'Username Update failed.')
             }
         }
     }
@@ -178,27 +197,26 @@ function Profile() {
             )
             localStorage.removeItem("login");
             navigate("/");
-        } catch (error: any) {
-            setError(error.response?.data?.message || 'Account deletion failed.')
+        } catch (err) {
+            const apiErr = err as ApiError;
+            setError(apiErr.response?.data?.message || 'Account deletion failed.')
         }
-
     }
-
 
     return (
         <div style={{ display: "flex", marginTop: "60px", minHeight: "100vh" }}>
             <div style={styles.sidebar}>
                 <h3 style={styles.heading}>Account</h3>
-                <button onClick={() => setActiveTab("username")} style={activeTab === "username" ? styles.activeTab : styles.tab}>
+                <button onClick={() => switchTab("username")} style={activeTab === "username" ? styles.activeTab : styles.tab}>
                     Username Update
                 </button>
-                <button onClick={() => setActiveTab("email")} style={activeTab === "email" ? styles.activeTab : styles.tab}>
+                <button onClick={() => switchTab("email")} style={activeTab === "email" ? styles.activeTab : styles.tab}>
                     Email Update
                 </button>
-                <button onClick={() => setActiveTab("password")} style={activeTab === "password" ? styles.activeTab : styles.tab}>
+                <button onClick={() => switchTab("password")} style={activeTab === "password" ? styles.activeTab : styles.tab}>
                     Password Update
                 </button>
-                <button onClick={() => setActiveTab("delete")} style={activeTab === "delete" ? styles.activeTab : styles.tab}>
+                <button onClick={() => switchTab("delete")} style={activeTab === "delete" ? styles.activeTab : styles.tab}>
                     Account Deletion
                 </button>
             </div>
@@ -211,6 +229,7 @@ function Profile() {
                         <label style={styles.label}>
                             New Username:
                             <input type="text"
+                                value={newUsername}
                                 onChange={(e) => setNewUsername(e.target.value)}
                                 style={styles.input} />
                         </label>
@@ -228,9 +247,9 @@ function Profile() {
                         <label style={styles.label}>
                             New Email:
                             <input type="text"
+                                value={newEmail}
                                 onChange={(e) => setEmail(e.target.value)}
                                 style={styles.input} />
-
                         </label>
                         <button onClick={handleEmailUpdate} style={styles.button}>Submit</button>
                         {success && <p style={{ color: "green" }}>{success}</p>}
@@ -242,13 +261,15 @@ function Profile() {
                     <>
                         <label style={styles.label}>
                             <span style={{ width: "160px", display: "inline-block", textAlign: "left" }}>Current Password:</span>
-                            <input type="text"
+                            <input type="password"
+                                value={currentPassword}
                                 onChange={(e) => setCurrentPassword(e.target.value)}
                                 style={styles.input} />
                         </label>
                         <label style={styles.label}>
                             <span style={{ width: "160px", display: "inline-block", textAlign: "left" }}>New Password:</span>
-                            <input type="text"
+                            <input type="password"
+                                value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 style={styles.input} />
                         </label>
@@ -266,7 +287,8 @@ function Profile() {
                         </div>
                         <label style={styles.label}>
                             <span style={{ width: "160px", display: "inline-block", textAlign: "left" }}>Confirm Password:</span>
-                            <input type="text"
+                            <input type="password"
+                                value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 style={styles.input} />
                         </label>
@@ -274,7 +296,6 @@ function Profile() {
                         {success && <p style={{ color: "green" }}>{success}</p>}
                         {error && <p style={{ color: "red" }}>{error}</p>}
                     </>
-
                 )}
 
                 {activeTab === "delete" && (

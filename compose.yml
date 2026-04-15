@@ -41,7 +41,7 @@ services:
     networks:
       - peerprep-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -124,7 +124,11 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       QUESTION_SERVICE_URL: http://question-service:3002
       USER_SERVICE_URL: http://user-service:3001
+      JUDGE0_URL: http://judge0-server:2358
+      # FRONTEND_URL: ${PUBLIC_IP}:5173
+      FRONTEND_URL: http://localhost:5173
       CODE_EXECUTOR_URL: http://code-executor:2358
+      MONGODB_URI: ${COLLAB_MONGODB_URI}
     depends_on:
       redis:
         condition: service_healthy
@@ -170,7 +174,8 @@ services:
       REDIS_URL: "redis://redis:6379"
       MATCH_FOUND_STREAM: "match.found"
       JWT_SECRET: "${JWT_SECRET}"
-      FRONTEND_URL: "${PUBLIC_IP}:5173"
+      FRONTEND_URL: http://localhost:5173
+      #FRONTEND_URL: "${PUBLIC_IP}:5173"
     depends_on:
       redis:
         condition: service_healthy
@@ -210,6 +215,7 @@ services:
 volumes:
   mongodb_data:
   redis_data:
+
 
 networks:
   peerprep-network:
