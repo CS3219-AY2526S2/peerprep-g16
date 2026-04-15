@@ -54,6 +54,7 @@ function Collaboration() {
     const [endSessionForcedMsg, setEndSessionForcedMsg] = useState(false);
     const blockedIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const blockedAtRef = useRef<number>(0);
+    const isEndSessionButtonDisabled = endSessionState !== "idle" || incomingEndRequest || endSessionBlocked;
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -186,7 +187,7 @@ function Collaboration() {
     }, [matchingId, userId]);
 
     const handleEndSession = () => {
-        if (!socket || endSessionState !== "idle") return;
+        if (!socket || isEndSessionButtonDisabled) return;
         setEndSessionState("pending");
         socket.emit("endSession:request", { sessionId: matchingId });
     };
@@ -256,11 +257,11 @@ function Collaboration() {
 
                 <button
                     onClick={handleEndSession}
-                    disabled={endSessionState !== "idle" || endSessionBlocked}
+                    disabled={isEndSessionButtonDisabled}
                     style={{
                         ...styles.endButton,
-                        opacity: endSessionState !== "idle" || endSessionBlocked ? 0.6 : 1,
-                        cursor: endSessionState !== "idle" || endSessionBlocked ? "not-allowed" : "pointer",
+                        opacity: isEndSessionButtonDisabled ? 0.6 : 1,
+                        cursor: isEndSessionButtonDisabled ? "not-allowed" : "pointer",
                         background: endSessionState === "declined" ? "#dd842b" : "#e63946",
                     }}
                 >
