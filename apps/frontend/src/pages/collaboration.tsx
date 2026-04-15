@@ -10,11 +10,13 @@ import {
     fetchSession,
 } from "../api/collaborationService";
 import { Socket } from "socket.io-client";
+import FeedbackFormModal from "../components/feedbackFormModal";
 
 type ActivePanel = "whiteboard" | "code";
 
 type Question = {
     questionId: string;
+    _id?: string;
     title: string;
     topic: string[];
     difficulty: "Easy" | "Medium" | "Hard";
@@ -46,6 +48,7 @@ function Collaboration() {
     const [partnerOnline, setPartnerOnline] = useState<boolean | null>(null);
     const peerUsername = matchingId ? localStorage.getItem(`peer:${matchingId}`) : null;
     const whiteboardRef = useRef<WhiteboardHandle>(null);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
 
     if (!matchingId || !user) return <Navigate to="/" replace />;
 
@@ -290,6 +293,16 @@ function Collaboration() {
                         </div>
                     </div>
 
+                    <div style={{ marginBottom: "12px" }}>
+                        <button
+                            onClick={() => setShowFeedbackModal(true)}
+                            style={styles.feedbackButton}
+                            disabled={!question}
+                        >
+                            Give Feedback
+                        </button>
+                    </div>
+
                     <HintPanel
                         hints={question?.hints ?? []}
                         socket={socket}
@@ -320,6 +333,11 @@ function Collaboration() {
                     </div>
                 </div>
             </div>
+            <FeedbackFormModal
+            show={showFeedbackModal}
+            questionId={question?.questionId || ""}
+            onClose={() => setShowFeedbackModal(false)}
+            />
         </div>
     );
 }
@@ -404,5 +422,16 @@ const styles: Record<string, CSSProperties> = {
     declineEndBtn: {
         padding: "5px 14px", background: "transparent", color: "#495057",
         border: "1px solid #adb5bd", borderRadius: "6px", cursor: "pointer", fontSize: "12px",
+    },
+    feedbackButton: {
+        padding: "10px 14px",
+        background: "#6a4c93",
+        color: "#fff",
+        border: "none",
+        borderRadius: "8px",
+        cursor: "pointer",
+        fontSize: "13px",
+        fontWeight: 600,
+        width: "100%",
     },
 };
