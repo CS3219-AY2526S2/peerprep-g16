@@ -48,6 +48,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     private flushTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private questionTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
     private idleTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    private idleTimerExpiry = new Map<string, number>();
     private readonly stateSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private readonly initialUpsertSent = new Set<string>();
 
@@ -237,6 +238,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         if (idleTimer) {
             clearTimeout(idleTimer);
             this.idleTimers.delete(sessionId);
+            this.idleTimerExpiry.delete(sessionId);
         }
 
         // Cancel any pending flush and do a final immediate write, then clean up
@@ -556,6 +558,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         if (timer) {
             clearTimeout(timer);
             this.idleTimers.delete(sessionId);
+            this.idleTimerExpiry.delete(sessionId);
             this.logger.log(`Idle timer cancelled — user rejoined session ${sessionId}`);
         }
     }
@@ -575,12 +578,97 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
         if (remaining > 0) return; // partner is still connected
 
         this.logger.log(`All users left session ${sessionId} — starting ${IDLE_TIMEOUT_MS / 1000}s idle timer`);
+        this.idleTimerExpiry.set(sessionId, Date.now() + IDLE_TIMEOUT_MS);
         const timer = setTimeout(async () => {
             this.idleTimers.delete(sessionId);
+            this.idleTimerExpiry.delete(sessionId);
             this.logger.log(`Idle timeout reached — auto-terminating session ${sessionId}`);
             await this.endSession(sessionId);
         }, IDLE_TIMEOUT_MS);
         this.idleTimers.set(sessionId, timer);
+    }
+
+    // ─── Active session lookup (for rejoin flow) ──────────────────────────────
+
+    async getActiveSessionForUser(userId: string): Promise<{
+        sessionId: string;
+        otherUserId: string;
+        questionId?: string;
+        language: string;
+        remainingMs: number;
+        startedAt: Date;
+    } | null> {
+        // 1. In-memory map
+        for (const [, session] of this.sessions) {
+            if (
+                (session.userAId === userId || session.userBId === userId) &&
+                session.status === 'active'
+            ) {
+                const otherUserId = session.userAId === userId ? session.userBId : session.userAId;
+                const expiry = this.idleTimerExpiry.get(session.sessionId);
+                const remainingMs = expiry ? Math.max(0, expiry - Date.now()) : IDLE_TIMEOUT_MS;
+                return {
+                    sessionId: session.sessionId,
+                    otherUserId,
+                    questionId: session.question?.questionId,
+                    language: session.language,
+                    remainingMs,
+                    startedAt: session.createdAt,
+                };
+            }
+        }
+
+        // 2. Redis fallback
+        try {
+            const keys = await this.redis.keys(`${REDIS_PREFIX}*`);
+            for (const key of keys) {
+                const raw = await this.redis.get(key);
+                if (!raw) continue;
+                const session: Session = JSON.parse(raw);
+                if (
+                    (session.userAId === userId || session.userBId === userId) &&
+                    session.status === 'active'
+                ) {
+                    const otherUserId = session.userAId === userId ? session.userBId : session.userAId;
+                    return {
+                        sessionId: session.sessionId,
+                        otherUserId,
+                        questionId: session.question?.questionId,
+                        language: session.language,
+                        remainingMs: IDLE_TIMEOUT_MS,
+                        startedAt: new Date(session.createdAt),
+                    };
+                }
+            }
+        } catch (err: any) {
+            this.logger.warn(`Redis lookup failed in getActiveSessionForUser: ${err.message}`);
+        }
+
+        // 3. MongoDB fallback — sessions saved within the last 2-minute idle window
+        try {
+            const cutoff = new Date(Date.now() - IDLE_TIMEOUT_MS);
+            const doc = await this.sessionStateModel.findOne({
+                $or: [{ user1Id: userId }, { user2Id: userId }],
+                status: 'active',
+                lastSavedAt: { $gte: cutoff },
+            });
+            if (doc) {
+                const otherUserId = doc.user1Id === userId ? doc.user2Id : doc.user1Id;
+                const remainingMs = Math.max(0, IDLE_TIMEOUT_MS - (Date.now() - doc.lastSavedAt.getTime()));
+                return {
+                    sessionId: doc.sessionId,
+                    otherUserId,
+                    questionId: doc.questionId,
+                    language: doc.language ?? 'python',
+                    remainingMs,
+                    startedAt: doc.startedAt,
+                };
+            }
+        } catch (err: any) {
+            this.logger.warn(`MongoDB lookup failed in getActiveSessionForUser: ${err.message}`);
+        }
+
+        return null;
     }
 
     private getMockQuestion(_topic: string): any {
