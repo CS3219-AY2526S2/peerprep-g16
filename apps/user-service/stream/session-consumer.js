@@ -44,26 +44,30 @@ async function saveAttempts(event) {
 
   await Promise.all(
     records.map(({ userId, partnerId }) =>
-      AttemptModel.create({
-        userId,
-        partnerId,
-        collaborationSessionId: sessionId,
-        questionId,
-        questionTitle,
-        topic: topicArray,
-        difficulty,
-        code: code ?? '',
-        language,
-        hintsUsed: Number(hintsUsed) || 0,
-        testCasesPassed: Number(testCasesPassed) || 0,
-        duration: Number(duration) || 0,
-        whiteboardScreenshot: whiteboardScreenshot
-          ? Buffer.from(
-              whiteboardScreenshot.replace(/^data:image\/\w+;base64,/, ''),
-              'base64',
-            )
-          : undefined,
-      }),
+      AttemptModel.findOneAndUpdate(
+        { collaborationSessionId: sessionId, userId },
+        {
+          partnerId,
+          collaborationSessionId: sessionId,
+          userId,
+          questionId,
+          questionTitle,
+          topic: topicArray,
+          difficulty,
+          code: code ?? '',
+          language,
+          hintsUsed: Number(hintsUsed) || 0,
+          testCasesPassed: Number(testCasesPassed) || 0,
+          duration: Number(duration) || 0,
+          whiteboardScreenshot: whiteboardScreenshot
+            ? Buffer.from(
+                whiteboardScreenshot.replace(/^data:image\/\w+;base64,/, ''),
+                'base64',
+              )
+            : undefined,
+        },
+        { upsert: true, new: true },
+      ),
     ),
   );
 
