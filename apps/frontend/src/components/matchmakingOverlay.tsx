@@ -9,6 +9,7 @@ interface Props {
   difficulty: string;
   onCancel: () => void;
   onDismiss: () => void;
+  isRedirecting: boolean;
 }
 
 function MatchmakingOverlay({
@@ -19,6 +20,7 @@ function MatchmakingOverlay({
   difficulty,
   onCancel,
   onDismiss,
+  isRedirecting,
 }: Props) {
   return (
     <div style={styles.overlay}>
@@ -57,7 +59,15 @@ function MatchmakingOverlay({
               </p>
             )}
 
-            <button onClick={onCancel} style={styles.cancelButton}>
+            <button
+              onClick={onCancel}
+              disabled={isRedirecting}
+              style={{
+                ...styles.cancelButton,
+                opacity: isRedirecting ? 0.5 : 1,
+                cursor: isRedirecting ? 'not-allowed' : 'pointer'
+              }}
+            >
               Cancel
             </button>
           </>

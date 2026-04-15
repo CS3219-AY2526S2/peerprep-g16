@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import Redis from 'ioredis';
 
+type RedisError = Error & { code?: string };
+
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
   private client: Redis;
@@ -21,7 +23,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       maxRetriesPerRequest: 3,
     });
 
-    this.client.on('error', (err: any) => {
+    this.client.on('error', (err: RedisError) => {
       if (err.code === 'ECONNRESET') {
         this.logger.warn('Redis connection reset, reconnecting...');
         return;
@@ -35,9 +37,9 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
         resolve();
       });
 
-      this.client.once('error', (err: any) => {
+      this.client.once('error', (err: RedisError) => {
         if (err.code !== 'ECONNRESET') {
-          reject(err);
+          reject(err instanceof Error ? err : new Error(String(err)));
         }
       });
     });
