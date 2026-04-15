@@ -100,6 +100,7 @@ export async function startSessionConsumer() {
 
   console.log('[SessionConsumer] Polling for session.completed events…');
 
+  // eslint-disable-next-line no-constant-condition
   while (true) {
     try {
       const results = await redis.xreadgroup(
@@ -115,7 +116,9 @@ export async function startSessionConsumer() {
         '>',
       );
 
-      if (!results) continue;
+      if (!results) {
+        continue;
+      }
 
       for (const [, messages] of results) {
         for (const [id, fields] of messages) {

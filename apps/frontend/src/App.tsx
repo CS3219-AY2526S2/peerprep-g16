@@ -15,6 +15,7 @@ import Homepage from "./pages/homepage";
 import AdminPage from "./pages/adminPage";
 import Profile from "./pages/profile";
 import Collaboration from "./pages/collaboration";
+import ModelAnswer from "./pages/modelAnswer";
 import api from "./api/axiosInstance";
 import webStyles from "./components/styles";
 import History from "./pages/history";
@@ -86,7 +87,7 @@ function Appcontent() {
   const login = async (event: any) => {
     event.preventDefault();
     try {
-      const response = await api.post("http://localhost:3001/auth/login", {
+      const response = await api.post(`${import.meta.env.VITE_USER_SERVICE_URL}/auth/login`, {
         email,
         password,
       });
@@ -243,6 +244,14 @@ function Appcontent() {
           element={
             <ProtectedUserRoute>
               <Collaboration />
+            </ProtectedUserRoute>
+          }
+        />
+        <Route 
+          path="/modelSolution/:questionId" 
+          element={
+            <ProtectedUserRoute>
+              <ModelAnswer />
             </ProtectedUserRoute>
           }
         />

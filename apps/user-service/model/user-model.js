@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const Schema = mongoose.Schema;
 
@@ -36,8 +36,8 @@ const UserModelSchema = new Schema({
   },
   refreshToken: {
     type: String,
-    default: null
+    default: null,
   },
 });
 
-export default mongoose.model("UserModel", UserModelSchema);
+export default mongoose.model('UserModel', UserModelSchema);
