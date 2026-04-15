@@ -41,7 +41,7 @@ export class WhiteboardGateway
   ) {}
 
   private assertSocketInSession(client: Socket, sessionId: string): void {
-    if (client.data.sessionId !== sessionId) {
+    if ((client.data as { sessionId?: string }).sessionId !== sessionId) {
       throw new WsException('Unauthorized: not a member of this session');
     }
   }
