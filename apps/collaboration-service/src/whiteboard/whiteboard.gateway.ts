@@ -1,0 +1,352 @@
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  MessageBody,
+  ConnectedSocket,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  OnGatewayInit,
+  WsException,
+} from '@nestjs/websockets';
+import { Server, Socket } from 'socket.io';
+import { SessionsService } from '../sessions/sessions.service';
+import { ConfigService } from '@nestjs/config';
+import { verify } from 'jsonwebtoken';
+
+interface SocketUser {
+  id: string;
+  isAdmin: boolean;
+}
+
+interface AuthenticatedSocket extends Socket {
+  user: SocketUser;
+}
+
+interface SocketData {
+  sessionId?: string;
+  userId?: string;
+}
+
+@WebSocketGateway({ cors: { origin: '*' } })
+export class WhiteboardGateway
+  implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
+{
+  @WebSocketServer()
+  server: Server;
+
+  constructor(
+    private readonly sessionsService: SessionsService,
+    private readonly configService: ConfigService,
+  ) {}
+
+  private assertSocketInSession(client: Socket, sessionId: string): void {
+    if ((client.data as { sessionId?: string }).sessionId !== sessionId) {
+      throw new WsException('Unauthorized: not a member of this session');
+    }
+  }
+
+  afterInit(server: Server) {
+    this.sessionsService.setServer(server);
+
+    // verify JWT before allowing WebSocket connection
+    server.use((socket, next) => {
+      const token = socket.handshake.auth['token'] as string | undefined;
+      if (!token) {
+        return next(new Error('No token provided'));
+      }
+
+      const secret = this.configService.get<string>('JWT_SECRET');
+      if (!secret) return next(new Error('JWT_SECRET not configured'));
+
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+        const payload = verify(token, secret) as {
+          id: string;
+          isAdmin: boolean;
+        };
+
+        if (payload.isAdmin) {
+          return next(new Error('Admins cannot access collaboration sessions'));
+        }
+
+        // attach user to socket for use in handlers
+        (socket as AuthenticatedSocket).user = payload;
+        next();
+      } catch {
+        return next(new Error('Invalid or expired token'));
+      }
+    });
+  }
+
+  handleConnection(client: Socket) {
+    console.log(`Client connected: ${client.id}`);
+  }
+
+  handleDisconnect(client: Socket) {
+    const { sessionId, userId } = (client.data as SocketData) ?? {};
+    console.log(
+      `Client disconnected: ${client.id}${sessionId ? ` (session ${sessionId})` : ''}`,
+    );
+    if (sessionId) {
+      client.to(sessionId).emit('partnerDisconnected', { userId });
+      this.sessionsService.onUserLeft(sessionId, this.server);
+    }
+  }
+
+  @SubscribeMessage('joinSession')
+  handleJoinSession(
+    @MessageBody() data: { sessionId: string; userId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const session = this.sessionsService.findOne(data.sessionId);
+    if (!session) {
+      client.emit('error', { message: 'Session not found' });
+      return;
+    }
+
+    // check user belongs to this session
+    const user = (client as AuthenticatedSocket).user;
+    if (session.userAId !== user.id && session.userBId !== user.id) {
+      client.emit('error', { message: 'You are not part of this session' });
+      return;
+    }
+
+    void client.join(data.sessionId);
+    (client.data as SocketData).sessionId = data.sessionId;
+    (client.data as SocketData).userId = user.id;
+    console.log(`User ${user.id} joined session ${data.sessionId}`);
+
+    this.sessionsService.onUserJoined(data.sessionId);
+    client.to(data.sessionId).emit('partnerReconnected', { userId: user.id });
+
+    client.emit('whiteboardState', { elements: session.whiteboardElements });
+    client.emit('codeState', {
+      code: session.code,
+      language: session.language,
+    });
+    client.emit('hintState', { revealedCount: session.revealedHints });
+  }
+
+  @SubscribeMessage('whiteboardUpdate')
+  handleWhiteboardUpdate(
+    @MessageBody()
+    data: { sessionId: string; userId: string; elements: unknown[] },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    this.sessionsService.updateWhiteboard(data.sessionId, data.elements);
+    client.to(data.sessionId).emit('whiteboardUpdate', {
+      elements: data.elements,
+      userId: data.userId,
+    });
+  }
+
+  @SubscribeMessage('codeUpdate')
+  handleCodeUpdate(
+    @MessageBody()
+    data: {
+      sessionId: string;
+      userId: string;
+      code: string;
+      language?: string;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    this.sessionsService.updateCode(data.sessionId, data.code, data.language);
+    client.to(data.sessionId).emit('codeUpdate', {
+      code: data.code,
+      language: data.language,
+      userId: data.userId,
+    });
+  }
+
+  @SubscribeMessage('codeState')
+  handleCodeState(
+    @MessageBody() data: { sessionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    const session = this.sessionsService.findOne(data.sessionId);
+    if (!session) {
+      client.emit('error', { message: 'Session not found' });
+      return;
+    }
+    client.emit('codeState', {
+      code: session.code,
+      language: session.language,
+    });
+  }
+
+  @SubscribeMessage('voice:offer')
+  handleVoiceOffer(
+    @MessageBody()
+    data: { sessionId: string; offer: RTCSessionDescriptionInit },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client.to(data.sessionId).emit('voice:offer', { offer: data.offer });
+  }
+
+  @SubscribeMessage('voice:answer')
+  handleVoiceAnswer(
+    @MessageBody()
+    data: { sessionId: string; answer: RTCSessionDescriptionInit },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client.to(data.sessionId).emit('voice:answer', { answer: data.answer });
+  }
+
+  @SubscribeMessage('voice:ice-candidate')
+  handleIceCandidate(
+    @MessageBody() data: { sessionId: string; candidate: RTCIceCandidateInit },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client
+      .to(data.sessionId)
+      .emit('voice:ice-candidate', { candidate: data.candidate });
+  }
+
+  @SubscribeMessage('voice:end')
+  handleVoiceEnd(
+    @MessageBody() data: { sessionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client.to(data.sessionId).emit('voice:end');
+  }
+
+  @SubscribeMessage('hint:request')
+  handleHintRequest(
+    @MessageBody() data: { sessionId: string; hintIndex: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client
+      .to(data.sessionId)
+      .emit('hint:request', { hintIndex: data.hintIndex });
+  }
+
+  @SubscribeMessage('hint:approve')
+  handleHintApprove(
+    @MessageBody() data: { sessionId: string; hintIndex: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    this.sessionsService.updateRevealedHints(
+      data.sessionId,
+      data.hintIndex + 1,
+    );
+    client
+      .to(data.sessionId)
+      .emit('hint:approve', { hintIndex: data.hintIndex });
+  }
+
+  @SubscribeMessage('hint:decline')
+  handleHintDecline(
+    @MessageBody() data: { sessionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client.to(data.sessionId).emit('hint:decline');
+  }
+
+  @SubscribeMessage('code:run')
+  handleCodeRun(
+    @MessageBody() data: { sessionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client.to(data.sessionId).emit('code:run');
+  }
+
+  @SubscribeMessage('code:result')
+  handleCodeResult(
+    @MessageBody()
+    data: {
+      sessionId: string;
+      output: { type?: string; results?: Array<{ passed: boolean }> } | null;
+    },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    // Track how many test cases passed so it can be saved on session end
+    if (data.output?.type === 'tests' && Array.isArray(data.output.results)) {
+      const passed = data.output.results.filter((r) => r.passed).length;
+      this.sessionsService.updateTestCasesPassed(data.sessionId, passed);
+    }
+
+    client.to(data.sessionId).emit('code:result', { output: data.output });
+  }
+
+  @SubscribeMessage('cursor:update')
+  handleCursorUpdate(
+    @MessageBody()
+    data: { sessionId: string; userId: string; line: number; col: number },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client.to(data.sessionId).emit('cursor:update', {
+      userId: data.userId,
+      line: data.line,
+      col: data.col,
+    });
+  }
+
+  @SubscribeMessage('endSession:request')
+  handleEndSessionRequest(
+    @MessageBody() data: { sessionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client.to(data.sessionId).emit('endSession:request');
+  }
+
+  @SubscribeMessage('endSession:decline')
+  handleEndSessionDecline(
+    @MessageBody() data: { sessionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    client.to(data.sessionId).emit('endSession:decline');
+  }
+
+  @SubscribeMessage('whiteboard:screenshot')
+  handleWhiteboardScreenshot(
+    @MessageBody() data: { sessionId: string; screenshot: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    this.sessionsService.setWhiteboardScreenshot(
+      data.sessionId,
+      data.screenshot,
+    );
+  }
+
+  @SubscribeMessage('endSession:approve')
+  async handleEndSessionApprove(
+    @MessageBody() data: { sessionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    this.assertSocketInSession(client, data.sessionId);
+    const result = await this.sessionsService.endSession(data.sessionId);
+    console.log(
+      `[endSession:approve] result for session ${data.sessionId}:`,
+      JSON.stringify(result),
+    );
+    if (result !== null && result !== undefined && 'blocked' in result) {
+      console.log(
+        `[endSession:approve] Redis down — emitting endSession:blocked to room ${data.sessionId}`,
+      );
+      this.server.to(data.sessionId).emit('endSession:blocked', {
+        reason: 'redis_unavailable',
+        message: 'Unable to save session data. Retrying automatically...',
+        retryDurationMs: 30000,
+      });
+      this.sessionsService.startPendingEndRetry(data.sessionId);
+    }
+    // endSession:confirmed is emitted by sessionsService.endSession() on success
+  }
+}

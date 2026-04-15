@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "experimentalDecorators": true,
+        "emitDecoratorMetadata": true,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "target": "ES2021",
+        "module": "commonjs",
+        "outDir": "./dist",
+        "baseUrl": "./",
+        "types": ["jest", "node"]
+
+    }
+}

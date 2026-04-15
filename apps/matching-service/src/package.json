@@ -1,0 +1,53 @@
+{
+    "scripts": {
+        "start": "nest start",
+        "dev": "nest start --watch",
+        "build": "nest build"
+    },
+    "devDependencies": {
+        "nodemon": "^3.1.14"
+    },
+    "dependencies": {
+        "@nestjs/cli": "^11.0.16",
+        "@nestjs/common": "^11.1.17",
+        "@nestjs/config": "^4.0.3",
+        "@nestjs/core": "^11.1.17",
+        "@nestjs/platform-express": "^11.1.17",
+        "cors": "^2.8.6",
+        "dotenv": "^17.3.1",
+        "express": "^5.2.1",
+        "redis": "^5.11.0",
+        "reflect-metadata": "^0.2.2",
+        "rxjs": "^7.8.2",
+        "ws": "^8.20.0"
+    },
+    "jest": {
+        "moduleFileExtensions": [
+            "js",
+            "json",
+            "ts"
+        ],
+        "rootDir": "src",
+        "testRegex": ".*\\.spec\\.ts$",
+        "transform": {
+            "^.+\\.(t|j)s$": [
+                "ts-jest",
+                {
+                    "tsconfig": "tsconfig.json"
+                }
+            ]
+        },
+        "collectCoverageFrom": [
+            "**/*.(t|j)s"
+        ],
+        "coverageDirectory": "../coverage",
+        "testEnvironment": "node"
+    },
+    "name": "src",
+    "version": "1.0.0",
+    "description": "",
+    "main": "dist/main.js",
+    "keywords": [],
+    "author": "",
+    "license": "ISC"
+}

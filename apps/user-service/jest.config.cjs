@@ -1,0 +1,20 @@
+module.exports = {
+  testEnvironment: 'node',
+  roots: ['<rootDir>'],
+  testMatch: ['**/__tests__/**/*.js', '**/?(*.)+(spec|test).js', '**/tests/**/*.js'],
+  collectCoverageFrom: [
+    '*.js',
+    'routes/**/*.js',
+    'controller/**/*.js',
+    'middleware/**/*.js',
+    'model/**/*.js',
+    'services/**/*.js',
+    'stream/**/*.js',
+    'config/**/*.js',
+    'utils/**/*.js',
+    '!node_modules/**',
+    '!dist/**',
+    '!coverage/**',
+  ],
+  coveragePathIgnorePatterns: ['/node_modules/', '/dist/', 'Dockerfile', '.env'],
+};
