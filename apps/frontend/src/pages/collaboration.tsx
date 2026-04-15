@@ -103,7 +103,8 @@ function Collaboration() {
                 });
 
                 connectedSocket.on("endSession:confirmed", () => {
-                    window.location.href = "/homepage";
+                    sessionStorage.setItem("canViewModelAnswer", "true");
+                    window.location.href = "/modelSolution/" + session.question?.questionId;
                 });
 
                 if (session.status === "waiting") {
