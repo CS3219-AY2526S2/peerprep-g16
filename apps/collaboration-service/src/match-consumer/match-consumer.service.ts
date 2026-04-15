@@ -81,17 +81,17 @@ export class MatchConsumerService implements OnModuleInit, OnModuleDestroy {
 
         if (!results) continue; // BLOCK timeout, no messages
 
-        for (const [, messages] of results) {
+        for (const [, messages] of results as Array<[string, Array<[string, string[]]>]>) {
           for (const [id, fields] of messages) {
             try {
-              const event = parseFields(fields as string[]);
+              const event = parseFields(fields);
               await this.processEvent(event);
             } catch (err: unknown) {
               const message = err instanceof Error ? err.message : String(err);
               this.logger.error(`Failed to process message ${id}: ${message}`);
             } finally {
               // Always ACK so we don't reprocess indefinitely on error
-              await this.redis.xack(STREAM_NAME, GROUP_NAME, id as string);
+              await this.redis.xack(STREAM_NAME, GROUP_NAME, id);
             }
           }
         }
