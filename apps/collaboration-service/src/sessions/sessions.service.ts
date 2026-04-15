@@ -28,6 +28,7 @@ const FLUSH_DELAY_MS = 1000;
 const DEFAULT_QUESTION_TIMEOUT_MS = 10000;
 const IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
 const STATE_SAVE_DEBOUNCE_MS = 30 * 1000; // 30 seconds
+const RECOVERY_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 const DIFFICULTY_RANK: Record<string, number> = { Easy: 0, Medium: 1, Hard: 2 };
 function resolveDifficulty(a: string | null, b: string | null): string | undefined {
@@ -51,6 +52,7 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     private idleTimerExpiry = new Map<string, number>();
     private readonly stateSaveTimers = new Map<string, ReturnType<typeof setTimeout>>();
     private readonly initialUpsertSent = new Set<string>();
+    private recoveryInterval: ReturnType<typeof setInterval> | null = null;
 
     constructor(
         private readonly configService: ConfigService,
@@ -70,9 +72,16 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
             this.logger.warn(`Could not connect to Redis — running without persistence: ${err.message}`);
         }
         await this.recoverUnpublishedSessions();
+        this.recoveryInterval = setInterval(
+            () => this.recoverUnpublishedSessions().catch((err: any) =>
+                this.logger.error(`Periodic recovery failed: ${err.message}`),
+            ),
+            RECOVERY_INTERVAL_MS,
+        );
     }
 
     async onModuleDestroy() {
+        if (this.recoveryInterval) clearInterval(this.recoveryInterval);
         for (const timer of this.questionTimeouts.values()) clearTimeout(timer);
         for (const timer of this.idleTimers.values()) clearTimeout(timer);
         for (const timer of this.stateSaveTimers.values()) clearTimeout(timer);
