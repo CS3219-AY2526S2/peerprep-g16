@@ -345,7 +345,7 @@ function Collaboration() {
 
             <div style={styles.layoutGrid}>
                 <div style={styles.questionColumn}>
-                    <div>
+                    <div style={{ flexShrink: 0 }}>
                         <div style={styles.problemHeader}>
                             <div style={{ flex: 1 }}>
                                 <h2 style={styles.problemTitle}>
@@ -391,7 +391,7 @@ function Collaboration() {
                         </div>
                     </div>
 
-                    <div style={{ marginBottom: "12px" }}>
+                    <div style={{ marginBottom: "12px", flexShrink: 0 }}>
                         <button
                             onClick={() => setShowFeedbackModal(true)}
                             style={styles.feedbackButton}
@@ -401,12 +401,14 @@ function Collaboration() {
                         </button>
                     </div>
 
-                    <HintPanel
-                        hints={question?.hints ?? []}
-                        socket={socket}
-                        sessionId={matchingId}
-                        userId={userId}
-                    />
+                    <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto" }}>
+                        <HintPanel
+                            hints={question?.hints ?? []}
+                            socket={socket}
+                            sessionId={matchingId}
+                            userId={userId}
+                        />
+                    </div>
                 </div>
 
                 <div style={styles.rightColumn}>
@@ -488,7 +490,7 @@ const styles: Record<string, CSSProperties> = {
     questionColumn: {
         padding: "20px 16px", background: "#fff", borderRight: "1px solid #e9ecef",
         overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px",
-        minHeight: 0,
+        minHeight: 0, height: "100%",
     },
     problemHeader: { display: "flex", alignItems: "flex-start", gap: "10px", marginBottom: "12px" },
     problemTitle: {
