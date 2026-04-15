@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 import { Test, TestingModule } from '@nestjs/testing';
 import { getModelToken } from '@nestjs/mongoose';
 import { ConfigService } from '@nestjs/config';
@@ -148,19 +149,23 @@ describe('SessionsService', () => {
 
     it('emits "questionReady" to the socket room', async () => {
       const mockEmit = jest.fn();
-      const mockIo = { to: jest.fn().mockReturnValue({ emit: mockEmit }) } as any;
+      const mockIo = {
+        to: jest.fn().mockReturnValue({ emit: mockEmit }),
+      } as any;
       service.setServer(mockIo);
 
       await service.attachQuestion('match-1', MOCK_QUESTION);
 
       expect(mockIo.to).toHaveBeenCalledWith('match-1');
-      expect(mockEmit).toHaveBeenCalledWith('questionReady', { question: MOCK_QUESTION });
+      expect(mockEmit).toHaveBeenCalledWith('questionReady', {
+        question: MOCK_QUESTION,
+      });
     });
 
     it('throws when session does not exist', async () => {
-      await expect(service.attachQuestion('no-such', MOCK_QUESTION)).rejects.toThrow(
-        'Session not found: no-such',
-      );
+      await expect(
+        service.attachQuestion('no-such', MOCK_QUESTION),
+      ).rejects.toThrow('Session not found: no-such');
     });
   });
 
@@ -236,11 +241,15 @@ describe('SessionsService', () => {
     it('stores the screenshot string', async () => {
       await service.create(SESSION_DATA);
       service.setWhiteboardScreenshot('match-1', 'data:image/png;base64,abc');
-      expect(service.findOne('match-1')?.whiteboardScreenshot).toBe('data:image/png;base64,abc');
+      expect(service.findOne('match-1')?.whiteboardScreenshot).toBe(
+        'data:image/png;base64,abc',
+      );
     });
 
     it('is a no-op for an unknown session', () => {
-      expect(() => service.setWhiteboardScreenshot('nope', 'img')).not.toThrow();
+      expect(() =>
+        service.setWhiteboardScreenshot('nope', 'img'),
+      ).not.toThrow();
     });
   });
 

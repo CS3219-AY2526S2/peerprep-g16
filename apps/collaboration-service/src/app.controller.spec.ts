@@ -1,4 +1,8 @@
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+import {
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { AppController } from './app.controller';
@@ -14,7 +18,10 @@ describe('AppController', () => {
         AppService,
         {
           provide: ConfigService,
-          useValue: { get: (key: string) => (key === 'CODE_EXECUTOR_URL' ? 'http://executor' : undefined) },
+          useValue: {
+            get: (key: string) =>
+              key === 'CODE_EXECUTOR_URL' ? 'http://executor' : undefined,
+          },
         },
       ],
     }).compile();
@@ -48,9 +55,9 @@ describe('AppController', () => {
       }).compile();
       const ctrl = module.get<AppController>(AppController);
 
-      await expect(ctrl.execute({ language: 'python', code: 'print(1)' })).rejects.toThrow(
-        InternalServerErrorException,
-      );
+      await expect(
+        ctrl.execute({ language: 'python', code: 'print(1)' }),
+      ).rejects.toThrow(InternalServerErrorException);
     });
 
     it('returns formatted result on a successful execution', async () => {
@@ -66,7 +73,10 @@ describe('AppController', () => {
         json: () => Promise.resolve(mockResponse),
       }) as any;
 
-      const result = await appController.execute({ language: 'python', code: 'print("hello")' });
+      const result = await appController.execute({
+        language: 'python',
+        code: 'print("hello")',
+      });
 
       expect(result).toEqual({
         stdout: 'hello\n',
@@ -85,20 +95,37 @@ describe('AppController', () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: () =>
-          Promise.resolve({ stdout: '42\n', stderr: null, compile_output: null, status: { description: 'Accepted' }, exit_code: 0 }),
+          Promise.resolve({
+            stdout: '42\n',
+            stderr: null,
+            compile_output: null,
+            status: { description: 'Accepted' },
+            exit_code: 0,
+          }),
       }) as any;
 
-      await appController.execute({ language: 'python', code: 'print(input())', stdin: '42' });
+      await appController.execute({
+        language: 'python',
+        code: 'print(input())',
+        stdin: '42',
+      });
 
-      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string);
+      const body = JSON.parse(
+        (global.fetch as jest.Mock).mock.calls[0][1].body as string,
+      );
       expect(body.stdin).toBe('42');
     });
 
     it('throws InternalServerErrorException when the executor returns a non-ok response', async () => {
-      global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 500 }) as any;
+      global.fetch = jest
+        .fn()
+        .mockResolvedValue({ ok: false, status: 500 }) as any;
 
       await expect(
-        appController.execute({ language: 'javascript', code: 'console.log(1)' }),
+        appController.execute({
+          language: 'javascript',
+          code: 'console.log(1)',
+        }),
       ).rejects.toThrow(InternalServerErrorException);
     });
 
@@ -106,11 +133,19 @@ describe('AppController', () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: () =>
-          Promise.resolve({ stdout: '', stderr: null, compile_output: null, status: { description: 'Accepted' }, exit_code: 0 }),
+          Promise.resolve({
+            stdout: '',
+            stderr: null,
+            compile_output: null,
+            status: { description: 'Accepted' },
+            exit_code: 0,
+          }),
       }) as any;
 
       await appController.execute({ language: 'python', code: '' });
-      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string);
+      const body = JSON.parse(
+        (global.fetch as jest.Mock).mock.calls[0][1].body as string,
+      );
       expect(body.language_id).toBe(71);
     });
 
@@ -118,11 +153,19 @@ describe('AppController', () => {
       global.fetch = jest.fn().mockResolvedValue({
         ok: true,
         json: () =>
-          Promise.resolve({ stdout: '', stderr: null, compile_output: null, status: { description: 'Accepted' }, exit_code: 0 }),
+          Promise.resolve({
+            stdout: '',
+            stderr: null,
+            compile_output: null,
+            status: { description: 'Accepted' },
+            exit_code: 0,
+          }),
       }) as any;
 
       await appController.execute({ language: 'javascript', code: '' });
-      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body as string);
+      const body = JSON.parse(
+        (global.fetch as jest.Mock).mock.calls[0][1].body as string,
+      );
       expect(body.language_id).toBe(63);
     });
   });

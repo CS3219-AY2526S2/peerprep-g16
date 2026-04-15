@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument */
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException, ForbiddenException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -36,7 +37,10 @@ const makeReq = (userId: string, isAdmin = false) => ({
 describe('SessionsController', () => {
   let controller: SessionsController;
   let mockService: jest.Mocked<
-    Pick<SessionsService, 'create' | 'findOne' | 'endSession' | 'getActiveSessionForUser'>
+    Pick<
+      SessionsService,
+      'create' | 'findOne' | 'endSession' | 'getActiveSessionForUser'
+    >
   >;
 
   beforeEach(async () => {
@@ -97,9 +101,9 @@ describe('SessionsController', () => {
     it('throws NotFoundException when no active session exists for user', async () => {
       mockService.getActiveSessionForUser.mockResolvedValue(null);
 
-      await expect(controller.getActiveSession(makeReq('user-a') as any)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        controller.getActiveSession(makeReq('user-a') as any),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('returns active session info when found', async () => {
@@ -113,7 +117,9 @@ describe('SessionsController', () => {
       };
       mockService.getActiveSessionForUser.mockResolvedValue(info);
 
-      const result = await controller.getActiveSession(makeReq('user-a') as any);
+      const result = await controller.getActiveSession(
+        makeReq('user-a') as any,
+      );
       expect(result).toEqual(info);
     });
   });
@@ -124,17 +130,17 @@ describe('SessionsController', () => {
     it('throws NotFoundException when session does not exist', () => {
       mockService.findOne.mockReturnValue(undefined);
 
-      expect(() => controller.findOne('match-1', makeReq('user-a') as any)).toThrow(
-        NotFoundException,
-      );
+      expect(() =>
+        controller.findOne('match-1', makeReq('user-a') as any),
+      ).toThrow(NotFoundException);
     });
 
     it('throws ForbiddenException when requesting user is not a participant', () => {
       mockService.findOne.mockReturnValue(makeSession());
 
-      expect(() => controller.findOne('match-1', makeReq('outsider') as any)).toThrow(
-        ForbiddenException,
-      );
+      expect(() =>
+        controller.findOne('match-1', makeReq('outsider') as any),
+      ).toThrow(ForbiddenException);
     });
 
     it('returns the session for userA', () => {
@@ -175,10 +181,18 @@ describe('SessionsController', () => {
 
     it('ends the session and returns the success payload', async () => {
       mockService.findOne.mockReturnValue(makeSession());
-      mockService.endSession.mockResolvedValue(makeSession({ status: 'ended' }));
+      mockService.endSession.mockResolvedValue(
+        makeSession({ status: 'ended' }),
+      );
 
-      const result = await controller.endSession('match-1', makeReq('user-a') as any);
-      expect(result).toEqual({ message: 'Session ended', redirectUrl: '/homepage' });
+      const result = await controller.endSession(
+        'match-1',
+        makeReq('user-a') as any,
+      );
+      expect(result).toEqual({
+        message: 'Session ended',
+        redirectUrl: '/homepage',
+      });
       expect(mockService.endSession).toHaveBeenCalledWith('match-1');
     });
   });

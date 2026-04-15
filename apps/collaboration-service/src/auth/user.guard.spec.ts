@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   ExecutionContext,
@@ -31,7 +32,8 @@ describe('UserGuard', () => {
         {
           provide: ConfigService,
           useValue: {
-            get: (key: string) => (key === 'JWT_SECRET' ? JWT_SECRET : undefined),
+            get: (key: string) =>
+              key === 'JWT_SECRET' ? JWT_SECRET : undefined,
           },
         },
       ],
@@ -67,7 +69,9 @@ describe('UserGuard', () => {
   });
 
   it('throws UnauthorizedException for an expired token', () => {
-    const token = sign({ id: 'user-x', isAdmin: false }, JWT_SECRET, { expiresIn: -1 });
+    const token = sign({ id: 'user-x', isAdmin: false }, JWT_SECRET, {
+      expiresIn: -1,
+    });
     const ctx = makeContext({ authorization: `Bearer ${token}` });
     expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
   });
