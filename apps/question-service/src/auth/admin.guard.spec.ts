@@ -22,10 +22,15 @@ type MockRequest = {
 type IsTokenRevokedFn = (userId: string, issuedAt?: number) => Promise<boolean>;
 
 type MockPrivilegeRevocationService = {
-  isTokenRevoked: jest.MockedFunction<IsTokenRevokedFn>;
+  isTokenRevoked: jest.Mock<ReturnType<IsTokenRevokedFn>, Parameters<IsTokenRevokedFn>>;
 };
 
-const mockedVerify = jest.mocked(verify);
+type VerifyFn = (token: string, secret: string) => MockUser;
+
+const mockedVerify = verify as unknown as jest.Mock<
+  ReturnType<VerifyFn>,
+  Parameters<VerifyFn>
+>;
 
 jest.mock('jsonwebtoken', () => ({
   verify: jest.fn(),
@@ -80,7 +85,9 @@ describe('AdminGuard', () => {
    */
   const createPrivilegeRevocationService =
     (): MockPrivilegeRevocationService => ({
-      isTokenRevoked: jest.fn<IsTokenRevokedFn>().mockResolvedValue(false),
+      isTokenRevoked: jest
+        .fn<ReturnType<IsTokenRevokedFn>, Parameters<IsTokenRevokedFn>>()
+        .mockResolvedValue(false),
     });
 
   /**
@@ -192,7 +199,7 @@ describe('AdminGuard', () => {
    */
   it('throws an error when JWT_SECRET is not configured', async () => {
     const guard = new AdminGuard(
-      createConfigService('secret'),
+      createConfigService(),
       createPrivilegeRevocationService() as never,
     );
 

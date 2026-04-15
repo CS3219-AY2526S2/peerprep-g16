@@ -37,6 +37,14 @@ export class AppController {
     return this.appService.getHello();
   }
 
+  @Get('health')
+  healthCheck() {
+    return {
+      status: 'ok',
+      service: 'collaboration-service',
+    };
+  }
+
   @Post('execute')
   async execute(
     @Body() body: { language: string; code: string; stdin?: string },
