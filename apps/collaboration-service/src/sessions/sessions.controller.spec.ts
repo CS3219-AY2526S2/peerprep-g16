@@ -37,15 +37,11 @@ const makeReq = (userId: string, isAdmin = false) => ({
 describe('SessionsController', () => {
   let controller: SessionsController;
   let mockService: jest.Mocked<
-    Pick<
-      SessionsService,
-      'create' | 'findOne' | 'endSession' | 'getActiveSessionForUser'
-    >
+    Pick<SessionsService, 'findOne' | 'endSession' | 'getActiveSessionForUser'>
   >;
 
   beforeEach(async () => {
     mockService = {
-      create: jest.fn(),
       findOne: jest.fn(),
       endSession: jest.fn(),
       getActiveSessionForUser: jest.fn(),
@@ -70,29 +66,6 @@ describe('SessionsController', () => {
     }).compile();
 
     controller = module.get<SessionsController>(SessionsController);
-  });
-
-  // ── create() ─────────────────────────────────────────────────────────────
-
-  describe('create()', () => {
-    it('delegates to service.create and returns the result', async () => {
-      const session = makeSession({ status: 'waiting' });
-      mockService.create.mockResolvedValue(session);
-
-      const result = await controller.create({
-        userAId: 'user-a',
-        userBId: 'user-b',
-        matchId: 'match-1',
-        topic: 'Arrays',
-        userADifficulty: 'Easy',
-        userBDifficulty: 'Medium',
-      });
-
-      expect(result).toEqual(session);
-      expect(mockService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ matchId: 'match-1', userAId: 'user-a' }),
-      );
-    });
   });
 
   // ── getActiveSession() ────────────────────────────────────────────────────

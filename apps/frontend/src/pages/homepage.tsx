@@ -160,7 +160,7 @@ function Homepage() {
                 const response = await api.get<{ topics: string[] }>(
                     `${QUESTION_SERVICE_URL}/questions/topics`
                 );
-                setTopics(response.data.topics);
+                setTopics(Array.isArray(response.data.topics) ? response.data.topics : []);
             } catch (err) {
                 console.error("Failed to fetch topics", err);
             } finally {

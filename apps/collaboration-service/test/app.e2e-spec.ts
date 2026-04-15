@@ -18,6 +18,7 @@ jest.mock('ioredis', () =>
     get: jest.fn().mockResolvedValue(null),
     set: jest.fn().mockResolvedValue('OK'),
     del: jest.fn().mockResolvedValue(1),
+    ping: jest.fn().mockResolvedValue('PONG'),
     xadd: jest.fn().mockResolvedValue('stream-message-1'),
     disconnect: jest.fn(),
   })),
@@ -27,6 +28,7 @@ const JWT_SECRET = randomBytes(32).toString('hex');
 
 describe('collaboration-service integration', () => {
   let app: INestApplication<App>;
+  let sessionsService: SessionsService;
 
   const userAToken = sign({ id: 'user-a', isAdmin: false }, JWT_SECRET);
   const userBToken = sign({ id: 'user-b', isAdmin: false }, JWT_SECRET);
@@ -41,6 +43,14 @@ describe('collaboration-service integration', () => {
         return undefined;
       },
     };
+    const nullQuery = Object.assign(Promise.resolve(null), {
+      lean: () => Promise.resolve(null),
+    });
+    const sessionStateModel = {
+      findOneAndUpdate: jest.fn().mockResolvedValue({}),
+      findOne: jest.fn().mockReturnValue(nullQuery),
+      find: jest.fn().mockResolvedValue([]),
+    };
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [SessionsController],
@@ -53,7 +63,10 @@ describe('collaboration-service integration', () => {
         {
           provide: SessionsService,
           useFactory: () => {
-            const service = new SessionsService(configService as ConfigService);
+            const service = new SessionsService(
+              configService as ConfigService,
+              sessionStateModel as never,
+            );
             service.onModuleInit = jest.fn();
             return service;
           },
@@ -61,6 +74,7 @@ describe('collaboration-service integration', () => {
       ],
     }).compile();
 
+    sessionsService = moduleFixture.get<SessionsService>(SessionsService);
     app = moduleFixture.createNestApplication();
     await app.init();
   });
@@ -70,7 +84,7 @@ describe('collaboration-service integration', () => {
   });
 
   const createSession = () =>
-    request(app.getHttpServer()).post('/sessions/create').send({
+    sessionsService.create({
       userAId: 'user-a',
       userBId: 'user-b',
       matchId: 'match-1',
@@ -80,9 +94,9 @@ describe('collaboration-service integration', () => {
     });
 
   it('creates a collaboration session from a match handoff payload', async () => {
-    const response = await createSession().expect(201);
+    const session = await createSession();
 
-    expect(response.body).toMatchObject({
+    expect(session).toMatchObject({
       sessionId: 'match-1',
       userAId: 'user-a',
       userBId: 'user-b',
@@ -97,7 +111,7 @@ describe('collaboration-service integration', () => {
   });
 
   it('requires a valid non-admin participant token to fetch a session', async () => {
-    await createSession().expect(201);
+    await createSession();
 
     await request(app.getHttpServer()).get('/sessions/match-1').expect(401);
 
@@ -120,7 +134,7 @@ describe('collaboration-service integration', () => {
   });
 
   it('allows a participant to end a session and prevents later access', async () => {
-    await createSession().expect(201);
+    await createSession();
 
     await request(app.getHttpServer())
       .post('/sessions/match-1/end')

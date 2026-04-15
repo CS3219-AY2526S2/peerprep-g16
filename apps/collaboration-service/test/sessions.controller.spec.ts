@@ -3,9 +3,29 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { SessionsController } from '../src/sessions/sessions.controller';
-import { SessionsService } from '../src/sessions/sessions.service';
+import { ConfigService } from '@nestjs/config';
+import {
+  SessionsService,
+  Question,
+  Session,
+} from '../src/sessions/sessions.service';
 import { UserGuard } from '../src/auth/user.guard';
-import { Session } from '../src/sessions/sessions.service';
+
+const makeQuestion = (overrides: Partial<Question> = {}): Question => ({
+  questionId: 'two-sum',
+  title: 'Two Sum',
+  topic: ['Arrays'],
+  difficulty: 'Easy',
+  description: 'Find two numbers that add up to target.',
+  constraints: ['2 <= nums.length <= 10^4'],
+  examples: [],
+  hints: ['Use a hash map.'],
+  testCases: {
+    sample: [{ input: '[2,7,11,15]\n9', expectedOutput: '[0,1]' }],
+    hidden: [],
+  },
+  ...overrides,
+});
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -16,7 +36,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     userBId: 'user-b',
     matchId: 'session-1',
     topic: 'Arrays',
-    question: { questionId: 'two-sum', title: 'Two Sum' },
+    question: makeQuestion(),
     whiteboardElements: [],
     code: 'print(1)',
     language: 'python',
@@ -45,7 +65,16 @@ describe('SessionsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [SessionsController],
-      providers: [{ provide: SessionsService, useValue: mockService }],
+      providers: [
+        { provide: SessionsService, useValue: mockService },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: (key: string) =>
+              key === 'COLLAB_SERVICE_URL' ? 'http://localhost:3003' : undefined,
+          },
+        },
+      ],
     })
       .overrideGuard(UserGuard)
       .useValue(mockUserGuard)
@@ -97,7 +126,18 @@ describe('SessionsController', () => {
       // Override the middleware user for this test
       const moduleRef = await Test.createTestingModule({
         controllers: [SessionsController],
-        providers: [{ provide: SessionsService, useValue: sessionsService }],
+        providers: [
+          { provide: SessionsService, useValue: sessionsService },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string) =>
+                key === 'COLLAB_SERVICE_URL'
+                  ? 'http://localhost:3003'
+                  : undefined,
+            },
+          },
+        ],
       })
         .overrideGuard(UserGuard)
         .useValue(mockUserGuard)
@@ -133,9 +173,7 @@ describe('SessionsController', () => {
 
       expect(res.body.message).toBe('Session ended');
       expect(res.body.redirectUrl).toBe('/homepage');
-      expect(
-        sessionsService.endSession.bind(sessionsService),
-      ).toHaveBeenCalledWith('session-1');
+      expect(sessionsService.endSession).toHaveBeenCalledWith('session-1');
     });
 
     it('returns 404 when session does not exist', async () => {
@@ -153,7 +191,18 @@ describe('SessionsController', () => {
 
       const moduleRef = await Test.createTestingModule({
         controllers: [SessionsController],
-        providers: [{ provide: SessionsService, useValue: sessionsService }],
+        providers: [
+          { provide: SessionsService, useValue: sessionsService },
+          {
+            provide: ConfigService,
+            useValue: {
+              get: (key: string) =>
+                key === 'COLLAB_SERVICE_URL'
+                  ? 'http://localhost:3003'
+                  : undefined,
+            },
+          },
+        ],
       })
         .overrideGuard(UserGuard)
         .useValue(mockUserGuard)
