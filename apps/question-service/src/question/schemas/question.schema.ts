@@ -104,6 +104,15 @@ export class Question {
     sample: TestCase[];
     hidden: TestCase[];
   };
+
+  @Prop ({ required: true })
+  modelAnswer: string;
+
+  @Prop ({required: true})
+  modelAnswerTimeComplexity: string;
+
+  @Prop ({required: true})
+  modelAnswerExplanation: string;
 }
 
 export const QuestionSchema = SchemaFactory.createForClass(Question);

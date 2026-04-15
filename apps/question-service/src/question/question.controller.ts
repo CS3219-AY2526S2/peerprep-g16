@@ -147,4 +147,14 @@ export class QuestionController {
   async selectQuestion(@Body() selectQuestionDto: SelectQuestionDto) {
     return this.questionService.selectQuestion(selectQuestionDto);
   }
+
+  @Get(':questionId/model-answer')
+  async findModelAnswer(@Param('questionId') questionId: string) {
+    return this.questionService.findModelAnswer(questionId);
+  }
+
+  @Get(':questionId/description')
+  async findQuestionDescription(@Param('questionId') questionId: string) {
+    return this.questionService.findQuestionDescription(questionId);
+  }
 }

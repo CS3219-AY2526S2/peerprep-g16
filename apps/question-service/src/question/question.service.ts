@@ -3,6 +3,7 @@ import { Question, QuestionDocument } from './schemas/question.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { SelectQuestionDto } from './dto/select-question.dto';
+import { ConflictException, BadRequestException } from '@nestjs/common';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 
@@ -26,7 +27,7 @@ export class QuestionService {
   constructor(
     @InjectModel(Question.name)
     private readonly questionModel: Model<QuestionDocument>,
-  ) {}
+  ) { }
 
   /**
    * Retrieves all questions matching the optional topic and difficulty filters.
@@ -71,9 +72,24 @@ export class QuestionService {
    * @param createQuestionDto Request payload containing question data
    * @returns Promise resolving to the newly created question
    */
-  async create(createQuestionDto: CreateQuestionDto) {
-    const createdQuestion = new this.questionModel(createQuestionDto);
-    return createdQuestion.save();
+  async create(createQuestionDto: any) {
+    try {
+      const createdQuestion = new this.questionModel(createQuestionDto);
+      return await createdQuestion.save();
+    } catch (error: unknown) {
+      if (typeof error === 'object' && error !== null) {
+        if ('code' in error && (error as any).code === 11000) {
+          throw new ConflictException(
+            `Question ${createQuestionDto.questionId} already exists`,
+          );
+        }
+        if ('name' in error && (error as any).name === 'ValidationError' && 'errors' in error) {
+          const fields = Object.values((error as any).errors).map((e: any) => e.path);
+          throw new BadRequestException(`Missing required fields: ${fields.join(', ')}`);
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -240,4 +256,28 @@ export class QuestionService {
     const randomIndex = Math.floor(Math.random() * questions.length);
     return questions[randomIndex];
   }
+
+  async findModelAnswer(questionId: string) {
+    const result = await this.questionModel
+      .findOne({ questionId })
+      .select('modelAnswer modelAnswerTimeComplexity modelAnswerExplanation -_id')
+      .lean()
+      .exec();
+
+    if (!result) throw new NotFoundException(`Question ${questionId} not found`);
+    return result;
+  }
+
+  async findQuestionDescription(questionId: string) {
+    const result = await this.questionModel
+      .findOne({ questionId })
+      .select('description -_id')
+      .lean()
+      .exec();
+
+    if (!result) throw new NotFoundException(`Question ${questionId} not found`);
+    return result;
+  }
 }
+
+
