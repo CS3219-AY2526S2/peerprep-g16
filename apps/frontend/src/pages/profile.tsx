@@ -15,8 +15,6 @@ interface ApiError {
     };
 }
 
-const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
-
 function Profile() {
     const stored = localStorage.getItem("login");
     const user = stored ? JSON.parse(stored) : null;

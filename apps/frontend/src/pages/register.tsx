@@ -14,8 +14,6 @@ interface ApiError {
     };
 }
 
-const USER_SERVICE_URL = import.meta.env.VITE_USER_SERVICE_URL as string;
-
 function Register() {
     const [username, setUsername] = useState("");
     const [email, setEmail] = useState("");
